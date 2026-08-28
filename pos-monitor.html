@@ -17,7 +17,9 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="./icons/icon-167.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="./icons/icon-152.png" />
   
   <!-- Suppress non-fatal Tailwind CDN runtime warning in production -->
   <script>
@@ -188,7 +190,7 @@
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 sm:gap-2">
             <h1 class="text-sm sm:text-base lg:text-lg font-bold truncate tracking-wide" id="shop-name-display">POSPOS Live Monitor</h1>
-            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.3.2 Pro</span>
+            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.4.0 Pro</span>
           </div>
           <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 sm:gap-2 truncate">
             <span>DB: <strong id="dbname-display" class="text-slate-700 dark:text-slate-300">1683010466811</strong></span>
@@ -714,6 +716,40 @@
           </button>
         </div>
 
+        <!-- SCREEN WAKE LOCK SETTINGS SECTION -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-500"></i>
+                เปิดหน้าจอตื่นตลอดเวลา (Screen Wake Lock)
+              </span>
+              <span class="text-[11px] text-slate-500">ป้องกันไม่ให้หน้าจอดับขณะมอนิเตอร์หน้าร้าน/ครัว</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="setting-wakelock-enabled" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-300 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- HAPTIC FEEDBACK SETTINGS SECTION -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-500"></i>
+                ระบบสั่นตอบสนอง (Haptic Feedback)
+              </span>
+              <span class="text-[11px] text-slate-500">สั่นเตือนเบาๆ เมื่อแตะปุ่ม รีเฟรช หรือมีออเดอร์เข้า</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="setting-haptic-enabled" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-300 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+            </label>
+          </div>
+        </div>
+
         <!-- PWA INSTALL IN SETTINGS -->
         <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2">
           <div class="flex items-center justify-between">
@@ -751,7 +787,9 @@
       password: localStorage.getItem('pospos_pass') || 'CMvfr45tgb!serVeR',
       apiBase: 'https://go.pospos.co/api/v1',
       audioAlerts: localStorage.getItem('pospos_audio') !== 'false',
-      voiceAlerts: localStorage.getItem('pospos_voice') !== 'false'
+      voiceAlerts: localStorage.getItem('pospos_voice') !== 'false',
+      wakeLock: localStorage.getItem('pospos_wakelock') !== 'false',
+      hapticFeedback: localStorage.getItem('pospos_haptic') !== 'false'
     };
 
     let mqttClient = null;
@@ -771,10 +809,82 @@
     let isAvailableCollapsed = true;
     let hasCompletedInitialSync = false;
     let deferredInstallPrompt = null;
+    let swRegistration = null;
     
     // Thai Voice TTS Engine State
     let thaiVoice = null;
     let lastAnnouncements = {};
+
+    // Haptic Feedback Engine (Vibration API)
+    function triggerHaptic(type = 'light') {
+      if (!CONFIG.hapticFeedback || !('vibrate' in navigator)) return;
+      try {
+        if (type === 'light') navigator.vibrate(10);
+        else if (type === 'medium') navigator.vibrate(25);
+        else if (type === 'success') navigator.vibrate([15, 30, 15]);
+        else if (type === 'warning') navigator.vibrate([30, 40, 30]);
+      } catch (e) {}
+    }
+
+    // Screen Wake Lock API (Keep Screen Awake for POS/Kitchen Monitoring)
+    let wakeLockSentinel = null;
+    async function requestWakeLock() {
+      if (!CONFIG.wakeLock || !('wakeLock' in navigator)) return;
+      try {
+        if (!wakeLockSentinel) {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+          wakeLockSentinel.addEventListener('release', () => {
+            wakeLockSentinel = null;
+          });
+        }
+      } catch (err) {
+        console.log('Screen Wake Lock request:', err);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLockSentinel) {
+        try {
+          wakeLockSentinel.release();
+        } catch (e) {}
+        wakeLockSentinel = null;
+      }
+    }
+
+    // Modal Browser History & Swipe-Back Synchronization
+    let modalHistoryActive = false;
+    function areAnyModalsOpen() {
+      const tableModal = document.getElementById('table-detail-modal');
+      const settingsModal = document.getElementById('settings-modal');
+      const iosModal = document.getElementById('ios-install-modal');
+      return (tableModal && !tableModal.classList.contains('hidden')) ||
+             (settingsModal && !settingsModal.classList.contains('hidden')) ||
+             (iosModal && !iosModal.classList.contains('hidden'));
+    }
+
+    function syncModalHistory() {
+      const open = areAnyModalsOpen();
+      if (open && !modalHistoryActive) {
+        modalHistoryActive = true;
+        history.pushState({ modalActive: true }, '');
+      } else if (!open && modalHistoryActive) {
+        modalHistoryActive = false;
+      }
+    }
+
+    function closeAllModalsSilently() {
+      document.getElementById('table-detail-modal')?.classList.add('hidden');
+      document.getElementById('settings-modal')?.classList.add('hidden');
+      document.getElementById('ios-install-modal')?.classList.add('hidden');
+      selectedTableForModal = null;
+    }
+
+    window.addEventListener('popstate', (e) => {
+      if (modalHistoryActive) {
+        modalHistoryActive = false;
+        closeAllModalsSilently();
+      }
+    });
 
     // Live Realtime Digital Clock Function
     function updateLiveClock() {
@@ -853,6 +963,8 @@
         if (isIos) {
           document.getElementById('ios-install-modal')?.classList.remove('hidden');
           lucide.createIcons();
+          triggerHaptic('light');
+          syncModalHistory();
         } else {
           showToast({
             message: 'กรุณากดเมนู 3 จุดที่มุมขวาบนของบราวเซอร์ แล้วเลือก "ติดตั้งแอพ" หรือ "Add to Home Screen"',
@@ -871,6 +983,8 @@
 
     function closeIosInstallModal() {
       document.getElementById('ios-install-modal')?.classList.add('hidden');
+      triggerHaptic('light');
+      syncModalHistory();
     }
 
     // Initialize & Unlock Audio Context for Browser Autoplay policy
@@ -992,6 +1106,7 @@
     }
 
     function toggleTheme() {
+      triggerHaptic('light');
       const isDark = document.documentElement.classList.contains('dark');
       const newTheme = isDark ? 'light' : 'dark';
       applyTheme(newTheme, true);
@@ -1025,6 +1140,7 @@
     // Mobile View Switcher (Samsung S25U & iPhone 16 PM Ergonomics)
     function setMobileView(view) {
       currentMobileView = view;
+      triggerHaptic('light');
       const sectionTables = document.getElementById('section-tables');
       const sectionSide = document.getElementById('section-side');
 
@@ -1181,6 +1297,7 @@
 
     function toggleAudioAndVoiceAlerts() {
       initAudioContext();
+      triggerHaptic('medium');
       const isCurrentlyActive = CONFIG.audioAlerts || CONFIG.voiceAlerts;
       if (isCurrentlyActive) {
         CONFIG.audioAlerts = false;
@@ -1405,8 +1522,9 @@
 
         const totalItemsCount = (orderedList || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
         
-        // Sound & Thai Voice Trigger
+        // Sound & Thai Voice & Haptic Trigger
         playBeep('order');
+        triggerHaptic('warning');
         if (totalItemsCount > 0) {
           speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ ${totalItemsCount} รายการค่ะ`);
         } else {
@@ -1420,6 +1538,7 @@
       if (actionType === 'status' && subAction === 'action') {
         if (!table.alert.includes('action')) table.alert.push('action');
         playBeep('alert');
+        triggerHaptic('warning');
         speakThai(`โต๊ะ ${tableId} เรียกพนักงานค่ะ`, true);
         addUrgentAlertCard(tableId, 'call_staff', payload.message || 'ลูกค้ากดกริ่งเรียกพนักงานที่โต๊ะ');
       }
@@ -1428,6 +1547,7 @@
       if (actionType === 'status' && subAction === 'check_bill') {
         if (!table.alert.includes('check_bill')) table.alert.push('check_bill');
         playBeep('alert');
+        triggerHaptic('warning');
         speakThai(`โต๊ะ ${tableId} ขอเช็กบิลค่ะ`, true);
         addUrgentAlertCard(tableId, 'check_bill', 'ลูกค้าแจ้งขอเช็กบิลชำระเงิน');
       }
@@ -1920,11 +2040,15 @@
 
       document.getElementById('table-detail-modal').classList.remove('hidden');
       lucide.createIcons();
+      triggerHaptic('light');
+      syncModalHistory();
     }
 
     function closeTableDetailModal() {
       document.getElementById('table-detail-modal').classList.add('hidden');
       selectedTableForModal = null;
+      triggerHaptic('light');
+      syncModalHistory();
     }
 
     function triggerDirectTableSync() {
@@ -2153,15 +2277,22 @@
       document.getElementById('setting-password').value = CONFIG.password;
       document.getElementById('setting-audio-enabled').checked = CONFIG.audioAlerts;
       document.getElementById('setting-voice-enabled').checked = CONFIG.voiceAlerts;
+      document.getElementById('setting-wakelock-enabled').checked = CONFIG.wakeLock;
+      document.getElementById('setting-haptic-enabled').checked = CONFIG.hapticFeedback;
       document.getElementById('settings-modal').classList.remove('hidden');
+      triggerHaptic('light');
+      syncModalHistory();
     }
 
     function closeSettingsModal() {
       document.getElementById('settings-modal').classList.add('hidden');
+      triggerHaptic('light');
+      syncModalHistory();
     }
 
     function saveSettingsAndReconnect() {
       initAudioContext();
+      triggerHaptic('medium');
       CONFIG.shopName = document.getElementById('setting-shopname').value.trim() || 'POSPOS Live Store';
       CONFIG.dbname = document.getElementById('setting-dbname').value.trim();
       CONFIG.brokerUrl = document.getElementById('setting-broker-url').value.trim();
@@ -2169,6 +2300,8 @@
       CONFIG.password = document.getElementById('setting-password').value.trim();
       CONFIG.audioAlerts = document.getElementById('setting-audio-enabled').checked;
       CONFIG.voiceAlerts = document.getElementById('setting-voice-enabled').checked;
+      CONFIG.wakeLock = document.getElementById('setting-wakelock-enabled').checked;
+      CONFIG.hapticFeedback = document.getElementById('setting-haptic-enabled').checked;
 
       localStorage.setItem('pospos_shopname', CONFIG.shopName);
       localStorage.setItem('pospos_dbname', CONFIG.dbname);
@@ -2177,6 +2310,14 @@
       localStorage.setItem('pospos_pass', CONFIG.password);
       localStorage.setItem('pospos_audio', CONFIG.audioAlerts);
       localStorage.setItem('pospos_voice', CONFIG.voiceAlerts);
+      localStorage.setItem('pospos_wakelock', CONFIG.wakeLock);
+      localStorage.setItem('pospos_haptic', CONFIG.hapticFeedback);
+
+      if (CONFIG.wakeLock) {
+        requestWakeLock();
+      } else {
+        releaseWakeLock();
+      }
 
       updateAudioIcon();
       closeSettingsModal();
@@ -2323,20 +2464,73 @@
       window.addEventListener(evt, initAudioContext, { passive: true });
     });
 
-    // PWA Service Worker Registration
+    // PWA Service Worker Registration & Advanced Lifecycle Management (from web_video)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.3.2').catch(err => {
-          console.warn('PWA Service Worker registration skipped:', err);
+        navigator.serviceWorker.register('./sw.js?v=2.4.0', { scope: './' })
+          .then((reg) => {
+            swRegistration = reg;
+            console.log('[PWA] Service Worker active, scope:', reg.scope);
+
+            // Auto-check for updates on visibility resume (Fix for iOS/Android slow updates)
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                reg.update().catch(err => console.log('SW update check error:', err));
+                if (CONFIG.wakeLock && !wakeLockSentinel) {
+                  requestWakeLock();
+                }
+              }
+            });
+
+            // Listen for new version installed
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  showToast({
+                    message: '🔄 พบเวอร์ชันใหม่ กำลังอัปเดตระบบ...',
+                    type: 'info',
+                    duration: 3000
+                  });
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            });
+          })
+          .catch((err) => {
+            console.warn('PWA Service Worker registration skipped:', err);
+          });
+
+        // Smooth Auto-Reload when new SW takes control
+        let isRefreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            window.location.reload();
+          }
         });
       });
     }
+
+    // Dynamic Header Glassmorphic Shadow on Scroll
+    window.addEventListener('scroll', () => {
+      const header = document.querySelector('header');
+      if (header) {
+        if (window.scrollY > 15) {
+          header.classList.add('shadow-md', 'border-slate-300/80', 'dark:border-slate-700/80');
+        } else {
+          header.classList.remove('shadow-md', 'border-slate-300/80', 'dark:border-slate-700/80');
+        }
+      }
+    }, { passive: true });
 
     // App Initialization
     document.addEventListener('DOMContentLoaded', () => {
       initTheme();
       initThaiVoice();
       initPwaInstallPrompt();
+      requestWakeLock();
       updateLiveClock();
       setInterval(updateLiveClock, 1000); // Live digital clock ticks every second
       lucide.createIcons();

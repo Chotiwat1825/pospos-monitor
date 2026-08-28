@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pospos-monitor-v2.3.2';
+const CACHE_NAME = 'pospos-monitor-v2.4.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -6,10 +6,19 @@ const ASSETS_TO_CACHE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './icons/icon-180.png',
+  './icons/icon-167.png',
+  './icons/icon-152.png',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js',
   'https://unpkg.com/lucide@latest'
 ];
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
