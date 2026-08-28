@@ -1,8 +1,11 @@
-const CACHE_NAME = 'pospos-monitor-v2.2.2';
+const CACHE_NAME = 'pospos-monitor-v2.3.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js',
   'https://unpkg.com/lucide@latest'
