@@ -1355,13 +1355,7 @@
 
               const currentItemsCount = table.items.reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
               
-              // If order was added dynamically after startup sync completed
-              if (hasCompletedInitialSync && currentItemsCount > prevItemsCount && prevItemsCount >= 0) {
-                const diff = currentItemsCount - prevItemsCount;
-                playBeep('order');
-                speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ ${diff} รายการค่ะ`);
-                addOrderToLiveFeed(tableId, table.items, 'อัปเดตรายการสั่งอาหารสด');
-              }
+              // get/order is for silent state synchronization only (does not trigger false alarm alerts)
             } catch(e) {
               console.warn('Failed parsing product_list', e);
             }
