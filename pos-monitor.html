@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full dark" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" id="meta-theme-color" content="#020617" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="POSPOS Monitor" />
+  <title>POSPOS Live Store Monitor | ระบบติดตามหน้าร้านแบบ Realtime</title>
+  
+  <!-- PWA Manifest & Favicon -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23059669'/><path d='M30 25 v25 a10 10 0 0 0 20 0 v-25 M40 25 v50 M60 25 v50 a10 10 0 0 0 10 -10 v-40' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>" />
+  
+  <!-- Tailwind CSS & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- MQTT.js & Lucide Icons -->
+  <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.2s ease-out',
+            'zoom-in-95': 'zoomIn95 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            'pulse-ring': 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            zoomIn95: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+            pulseRing: {
+              '0%': { transform: 'scale(0.98)', opacity: '0.9' },
+              '50%': { transform: 'scale(1.03)', opacity: '0.4' },
+              '100%': { transform: 'scale(0.98)', opacity: '0.9' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Safe Area insets for iPhone 16 Pro Max, Samsung S25 Ultra, Dynamic Island */
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+    
+    body {
+      padding-top: var(--sat);
+      padding-left: var(--sal);
+      padding-right: var(--sar);
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .dark ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb { background: rgba(203, 213, 225, 0.9); border-radius: 9999px; }
+
+    /* Touch optimizations */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* Pull to refresh transition */
+    #pull-refresh-indicator {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease-out;
+    }
+  </style>
+</head>
+
+<body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white font-sans bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden pb-16 lg:pb-0">
+
+  <!-- OFFLINE STATUS BANNER -->
+  <div id="offline-network-banner" class="hidden bg-rose-600 text-white text-xs font-semibold px-4 py-2 text-center flex items-center justify-center gap-2 shadow-lg z-50">
+    <i data-lucide="wifi-off" class="w-4 h-4 animate-bounce"></i>
+    <span>ขาดการเชื่อมต่ออินเทอร์เน็ต กำลังรอการเชื่อมต่อใหม่...</span>
+  </div>
+
+  <!-- PULL TO REFRESH INDICATOR FOR MOBILE -->
+  <div id="pull-refresh-indicator" class="fixed top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-none opacity-0 -translate-y-6 flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+    <i id="pull-refresh-icon" data-lucide="rotate-cw" class="w-4 h-4"></i>
+    <span id="pull-refresh-text">ดึงลงเพื่อรีเฟรช</span>
+  </div>
+
+  <!-- TOP APP BAR (GLASSMORPHIC & SAFE AREA AWARE) -->
+  <header class="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-40 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 shadow-sm dark:shadow-slate-950/20 transition-colors">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Brand & Store Info -->
+      <div class="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-400 via-emerald-600 to-teal-800 flex items-center justify-center shadow-lg shadow-emerald-500/20 ring-1 ring-white/20 active:scale-95 transition-transform cursor-pointer shrink-0">
+          <i data-lucide="utensils" class="w-4 h-4 sm:w-5 sm:h-5 text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <h1 class="text-sm sm:text-base lg:text-lg font-bold truncate tracking-wide" id="shop-name-display">POSPOS Live Monitor</h1>
+            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.1 Pro</span>
+          </div>
+          <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 sm:gap-2 truncate">
+            <span>DB: <strong id="dbname-display" class="text-slate-700 dark:text-slate-300">1683010466811</strong></span>
+            <span class="text-slate-300 dark:text-slate-700">|</span>
+            <span id="shop-branch-display" class="text-slate-600 dark:text-slate-400">สาขา: 00001</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Summary Stats Pills (Desktop & Tablet) -->
+      <div class="hidden xl:flex items-center gap-2 bg-slate-200/50 dark:bg-slate-950/60 border border-slate-300/60 dark:border-slate-800/90 rounded-2xl p-1.5 text-xs font-medium shadow-inner">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 shadow-xs">
+          <i data-lucide="circle" class="w-3 h-3 text-slate-400 dark:text-slate-500 fill-slate-400 dark:fill-slate-500"></i>
+          <span>ว่าง: <strong id="count-available" class="text-slate-900 dark:text-white font-mono font-bold">0</strong></span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i>
+          <span>มีลูกค้า: <strong id="count-occupied" class="text-slate-900 dark:text-white font-mono font-bold">0</strong></span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+          <span>เรียกพนักงาน: <strong id="count-action" class="text-amber-700 dark:text-amber-300 font-mono font-bold">0</strong></span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+          <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+          <span>รอเช็กบิล: <strong id="count-checkbill" class="text-rose-700 dark:text-rose-300 font-mono font-bold">0</strong></span>
+        </div>
+      </div>
+
+      <!-- Controls & Actions -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        
+        <!-- Live MQTT Status Pill -->
+        <div id="mqtt-status-pill" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-sm">
+          <span id="mqtt-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span id="mqtt-status-text" class="font-semibold hidden sm:inline">Connecting</span>
+        </div>
+
+        <!-- Dark / Light Mode Toggle Button -->
+        <button id="btn-theme-toggle" onclick="toggleTheme()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="สลับโหมดสว่าง/มืด (T)">
+          <i id="icon-theme" data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
+        </button>
+
+        <!-- Sound Toggle Button -->
+        <button id="btn-sound-toggle" onclick="toggleAudioAlerts()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="เปิด/ปิดเสียงแจ้งเตือน">
+          <i id="icon-sound" data-lucide="volume-2" class="w-4 h-4 text-emerald-500 dark:text-emerald-400"></i>
+        </button>
+
+        <!-- Refresh Button -->
+        <button onclick="refreshAllData()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="รีเฟรชข้อมูลทั้งหมด (R)">
+          <i id="icon-refresh" data-lucide="rotate-cw" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Settings Button -->
+        <button onclick="openSettingsModal()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="ตั้งค่าร้านค้า / MQTT (S)">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT AREA -->
+  <main id="main-scroll-container" class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 overflow-hidden">
+    
+    <!-- LEFT / MAIN: FLOOR PLAN & TABLES (8 COLS ON DESKTOP, SWITCHABLE ON MOBILE) -->
+    <section id="section-tables" class="lg:col-span-8 flex flex-col gap-3.5 sm:gap-4 overflow-hidden h-full">
+      
+      <!-- Toolbar & Filters -->
+      <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white/90 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 p-2.5 sm:p-3 rounded-2xl shadow-sm dark:shadow-md transition-colors">
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
+          <button onclick="setTableFilter('all')" id="filter-all" class="min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition-all shadow-sm active:scale-95 flex items-center gap-1.5 shrink-0">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+            <span>ทั้งหมด</span>
+            <span id="btn-count-all" class="px-1.5 py-0.2 rounded-full bg-slate-950/20 text-[11px] font-mono">28</span>
+          </button>
+          <button onclick="setTableFilter('active')" id="filter-active" class="min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-1.5 shrink-0">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            <span>มีลูกค้า</span>
+            <span id="btn-count-occupied" class="px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-mono">0</span>
+          </button>
+          <button onclick="setTableFilter('alerts')" id="filter-alerts" class="min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-1.5 shrink-0">
+            <i data-lucide="bell" class="w-3.5 h-3.5 text-amber-500"></i>
+            <span>รอความช่วยเหลือ</span>
+            <span id="btn-count-alerts" class="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-[11px] font-mono">0</span>
+          </button>
+          <button onclick="setTableFilter('available')" id="filter-available" class="min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-1.5 shrink-0">
+            <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+            <span>โต๊ะว่าง</span>
+            <span id="btn-count-free" class="px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-mono">0</span>
+          </button>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono">
+          <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i> ซิงค์:</span>
+          <span id="last-sync-time" class="text-slate-800 dark:text-slate-300 font-semibold">--:--:--</span>
+        </div>
+      </div>
+
+      <!-- ACTIVE ALERTS CALLOUT BANNER (IF ANY) -->
+      <div id="urgent-alerts-container" class="hidden flex flex-col gap-2.5"></div>
+
+      <!-- TABLES GRID CONTAINER -->
+      <div id="tables-scroll-box" class="flex-1 overflow-y-auto pr-1">
+        <div id="tables-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-2.5 sm:gap-3.5">
+          <!-- Initial Skeleton Loading -->
+          <div class="col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+            <div class="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 animate-pulse h-36 flex flex-col justify-between">
+              <div class="flex justify-between items-center"><div class="h-6 w-10 bg-slate-200 dark:bg-slate-800 rounded-lg"></div><div class="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full"></div></div>
+              <div class="space-y-2"><div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-800/60 rounded"></div><div class="h-3 w-1/2 bg-slate-200 dark:bg-slate-800/60 rounded"></div></div>
+              <div class="h-4 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+            </div>
+            <div class="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 animate-pulse h-36 flex flex-col justify-between">
+              <div class="flex justify-between items-center"><div class="h-6 w-10 bg-slate-200 dark:bg-slate-800 rounded-lg"></div><div class="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full"></div></div>
+              <div class="space-y-2"><div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-800/60 rounded"></div><div class="h-3 w-1/2 bg-slate-200 dark:bg-slate-800/60 rounded"></div></div>
+              <div class="h-4 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT / SECONDARY: REALTIME ORDER STREAM & TOPIC LOGS (4 COLS ON DESKTOP) -->
+    <section id="section-side" class="lg:col-span-4 hidden lg:flex flex-col gap-4 overflow-hidden h-full">
+      
+      <!-- DESKTOP TAB NAVIGATION -->
+      <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button id="tab-orders-btn" onclick="switchRightTab('orders')" class="min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 shadow-sm transition-all active:scale-95">
+          <i data-lucide="receipt" class="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400"></i>
+          <span>Live Orders Feed</span>
+          <span id="live-orders-badge" class="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-bold">0</span>
+        </button>
+        <button id="tab-logs-btn" onclick="switchRightTab('logs')" class="min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-900 transition-all active:scale-95">
+          <i data-lucide="terminal" class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400"></i>
+          <span>MQTT Packets (<span id="packet-counter" class="font-mono">0</span>)</span>
+        </button>
+      </div>
+
+      <!-- CONTENT TAB 1: LIVE ORDERS FEED -->
+      <div id="tab-content-orders" class="flex-1 flex flex-col bg-white/90 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-4 overflow-hidden shadow-sm dark:shadow-lg transition-colors">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            รายการสั่งอาหารล่าสุด
+          </h2>
+          <button onclick="clearOrdersFeedWithUndo()" class="min-h-[32px] text-slate-500 dark:text-slate-400 hover:text-rose-500 text-xs flex items-center gap-1 font-mono transition-colors active:scale-95">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> ล้างฟีด
+          </button>
+        </div>
+
+        <div id="orders-stream-list" class="flex-1 overflow-y-auto space-y-3 pr-1">
+          <!-- Empty State Default -->
+          <div class="border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center h-full">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
+              <i data-lucide="inbox" class="w-6 h-6 text-slate-400 dark:text-slate-500"></i>
+            </div>
+            <p class="font-medium text-slate-600 dark:text-slate-400">รอรับออเดอร์ใหม่จากลูกค้า</p>
+            <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-1">เมื่อมีลูกค้ากดสั่งอาหารผ่าน E-Menu ระบบจะแสดงที่นี่ทันที</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTENT TAB 2: MQTT PACKET INSPECTOR -->
+      <div id="tab-content-logs" class="hidden flex-1 flex flex-col bg-white/90 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-4 overflow-hidden font-mono shadow-sm dark:shadow-lg transition-colors">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400"></i>
+            Live Topic Stream
+          </h2>
+          <button onclick="clearMqttLogs()" class="min-h-[32px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-[11px] transition-colors active:scale-95">Clear</button>
+        </div>
+
+        <div id="mqtt-logs-list" class="flex-1 overflow-y-auto space-y-2 text-[11px] pr-1">
+          <div class="border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400 dark:text-slate-600 text-xs">
+            MQTT Log stream active...
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MOBILE BOTTOM NAVIGATION (OPTIMIZED FOR S25 ULTRA & IPHONE 16 PRO MAX THUMB REACH) -->
+  <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-around shadow-2xl transition-colors pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <button onclick="setMobileView('tables')" id="mobile-nav-tables" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95">
+      <i data-lucide="layout-grid" class="w-5 h-5"></i>
+      <span class="text-[10px]">ผังโต๊ะ</span>
+    </button>
+    <button onclick="setMobileView('orders')" id="mobile-nav-orders" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95 relative">
+      <i data-lucide="receipt" class="w-5 h-5"></i>
+      <span class="text-[10px]">ออเดอร์สด</span>
+      <span id="mobile-orders-badge" class="absolute top-0 right-2 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+    </button>
+    <button onclick="setMobileView('logs')" id="mobile-nav-logs" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95">
+      <i data-lucide="radio" class="w-5 h-5"></i>
+      <span class="text-[10px]">MQTT Log</span>
+    </button>
+  </nav>
+
+  <!-- TABLE DETAIL MODAL -->
+  <div id="table-detail-modal" onclick="closeTableDetailModal()" class="fixed inset-0 z-50 bg-black/60 dark:bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div onclick="event.stopPropagation()" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+      
+      <!-- Modal Header -->
+      <div class="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+        <div class="flex items-center gap-3">
+          <div id="modal-table-badge" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg sm:text-xl font-mono shadow-xs">
+            --
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-wide" id="modal-table-title">โต๊ะ --</h3>
+              <span id="modal-table-status-pill" class="text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">ว่าง</span>
+            </div>
+            <p id="modal-table-time-info" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">เวลาเริ่ม: --:-- | ใช้งานแล้ว: 0 นาที</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-md hidden sm:inline-block">ESC</span>
+          <button onclick="closeTableDetailModal()" class="min-h-[36px] min-w-[36px] p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95" title="ปิดหน้าต่าง (Esc)">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Orders List) -->
+      <div class="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto flex-1 bg-white dark:bg-slate-900/40">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-emerald-500"></i>
+              รายการอาหารที่สั่งในโต๊ะนี้
+            </h4>
+            <span id="modal-total-items-count" class="text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md font-semibold">0 รายการ</span>
+          </div>
+
+          <div id="modal-items-list" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3 sm:gap-4">
+        <div>
+          <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">ยอดรวมโดยประมาณ</p>
+          <p class="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight" id="modal-total-price">฿0.00</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="triggerDirectTableSync()" class="min-h-[40px] px-3.5 sm:px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Sync
+          </button>
+          <button onclick="closeTableDetailModal()" class="min-h-[40px] px-4 sm:px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold active:scale-95 transition-all shadow-md shadow-emerald-500/20">
+            ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" onclick="closeSettingsModal()" class="fixed inset-0 z-50 bg-black/60 dark:bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div onclick="event.stopPropagation()" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <i data-lucide="settings-2" class="w-4 h-4 text-emerald-500"></i>
+          ตั้งค่าการเชื่อมต่อ Monitor
+        </h3>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-md hidden sm:inline-block">ESC</span>
+          <button onclick="closeSettingsModal()" class="min-h-[36px] min-w-[36px] p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto text-xs bg-white dark:bg-slate-900/40">
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Shop ID / dbname ร้านค้า</label>
+          <input type="text" id="setting-dbname" value="1683010466811" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
+          <p class="text-[11px] text-slate-500 mt-1">รหัสฐานข้อมูลร้านค้าจาก POSPOS เช่น 1683010466811</p>
+        </div>
+
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">MQTT Broker WebSocket URL</label>
+          <input type="text" id="setting-broker-url" value="wss://pospos.co:9013/" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Username</label>
+            <input type="text" id="setting-username" value="mqtt_server" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
+          </div>
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Password</label>
+            <input type="password" id="setting-password" value="CMvfr45tgb!serVeR" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-semibold text-slate-700 dark:text-slate-300 block">เสียงแจ้งเตือน (Audio Beep)</span>
+              <span class="text-[11px] text-slate-500">ส่งเสียงเมื่อมีออเดอร์ใหม่ / เรียกพนักงาน</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="setting-audio-enabled" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-300 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+          <button type="button" onclick="playBeep('order')" class="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+            <i data-lucide="play" class="w-3 h-3"></i> ทดสอบฟังเสียงแจ้งเตือน
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800/80 flex justify-end gap-3 items-center">
+        <button onclick="closeSettingsModal()" class="min-h-[40px] px-4 py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95">ยกเลิก</button>
+        <button onclick="saveSettingsAndReconnect()" class="min-h-[40px] px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs active:scale-95 transition-all shadow-md shadow-emerald-500/20">
+          บันทึก & เชื่อมต่อใหม่
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-[110] flex flex-col gap-2.5 pointer-events-none max-w-sm w-full"></div>
+
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <script>
+    const CONFIG = {
+      dbname: localStorage.getItem('pospos_dbname') || '1683010466811',
+      brokerUrl: localStorage.getItem('pospos_broker') || 'wss://pospos.co:9013/',
+      username: localStorage.getItem('pospos_user') || 'mqtt_server',
+      password: localStorage.getItem('pospos_pass') || 'CMvfr45tgb!serVeR',
+      apiBase: 'https://go.pospos.co/api/v1',
+      audioAlerts: localStorage.getItem('pospos_audio') !== 'false'
+    };
+
+    let mqttClient = null;
+    let tableData = {
+      titles: Array.from({length: 28}, (_, i) => String(i + 1)),
+      buffetTimeLimit: 0,
+      buffetWarningTimeEnd: 3,
+      tables: {}
+    };
+    let currentFilter = 'all';
+    let selectedTableForModal = null;
+    let packetCount = 0;
+    let liveOrdersCount = 0;
+    let audioContext = null;
+    let clearedOrdersBackup = null;
+    let currentMobileView = 'tables';
+
+    // Theme Switcher Engine (Light / Dark)
+    function initTheme() {
+      const savedTheme = localStorage.getItem('pospos_theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      applyTheme(savedTheme, false);
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.contains('dark');
+      const newTheme = isDark ? 'light' : 'dark';
+      applyTheme(newTheme, true);
+    }
+
+    function applyTheme(theme, showNotice = false) {
+      const icon = document.getElementById('icon-theme');
+      const metaTheme = document.getElementById('meta-theme-color');
+
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        if (icon) icon.setAttribute('data-lucide', 'sun');
+        if (metaTheme) metaTheme.setAttribute('content', '#020617');
+      } else {
+        document.documentElement.classList.remove('dark');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+        if (metaTheme) metaTheme.setAttribute('content', '#f8fafc');
+      }
+
+      localStorage.setItem('pospos_theme', theme);
+      lucide.createIcons();
+
+      if (showNotice) {
+        showToast({
+          message: theme === 'dark' ? 'เปลี่ยนเป็น Dark Mode เรียบร้อย' : 'เปลี่ยนเป็น Light Mode เรียบร้อย',
+          type: 'info'
+        });
+      }
+    }
+
+    // Mobile View Switcher (Samsung S25U & iPhone 16 PM Ergonomics)
+    function setMobileView(view) {
+      currentMobileView = view;
+      const sectionTables = document.getElementById('section-tables');
+      const sectionSide = document.getElementById('section-side');
+
+      // Update Nav buttons styling
+      ['tables', 'orders', 'logs'].forEach(v => {
+        const btn = document.getElementById('mobile-nav-' + v);
+        if (v === view) {
+          btn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95';
+        } else {
+          btn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95';
+        }
+      });
+
+      if (view === 'tables') {
+        sectionTables.classList.remove('hidden');
+        sectionSide.classList.add('hidden');
+        sectionSide.classList.remove('flex');
+      } else {
+        sectionTables.classList.add('hidden');
+        sectionSide.classList.remove('hidden');
+        sectionSide.classList.add('flex');
+
+        if (view === 'orders') {
+          switchRightTab('orders');
+        } else if (view === 'logs') {
+          switchRightTab('logs');
+        }
+      }
+    }
+
+    // Toast Notification System with Undo
+    function showToast({ message, type = 'info', actionText = null, onAction = null, duration = 4500 }) {
+      const container = document.getElementById('toast-container');
+      const toastId = 'toast-' + Math.random().toString(16).substring(2, 9);
+
+      let icon = 'info';
+      let borderClass = 'border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-slate-200';
+      if (type === 'success') {
+        icon = 'check-circle-2';
+        borderClass = 'border-emerald-500/40 bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-emerald-500/10';
+      } else if (type === 'error') {
+        icon = 'alert-triangle';
+        borderClass = 'border-rose-500/40 bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-rose-500/10';
+      } else if (type === 'warning') {
+        icon = 'bell';
+        borderClass = 'border-amber-500/40 bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-amber-500/10';
+      }
+
+      const toastHtml = `
+        <div id="${toastId}" class="pointer-events-auto p-3.5 sm:p-4 rounded-2xl border ${borderClass} shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="${icon}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-500' : (type === 'error' ? 'text-rose-500' : 'text-amber-500')} shrink-0"></i>
+            <span class="text-xs font-medium">${message}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            ${actionText ? `
+              <button id="${toastId}-btn" class="min-h-[32px] px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 active:scale-95 transition-all">
+                ${actionText}
+              </button>
+            ` : ''}
+            <button onclick="document.getElementById('${toastId}')?.remove()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      `;
+
+      container.insertAdjacentHTML('beforeend', toastHtml);
+      lucide.createIcons();
+
+      if (actionText && onAction) {
+        document.getElementById(`${toastId}-btn`)?.addEventListener('click', () => {
+          onAction();
+          document.getElementById(toastId)?.remove();
+        });
+      }
+
+      setTimeout(() => {
+        const el = document.getElementById(toastId);
+        if (el) {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(10px)';
+          el.style.transition = 'all 0.2s ease-out';
+          setTimeout(() => el.remove(), 200);
+        }
+      }, duration);
+    }
+
+    function initEmptyTables() {
+      tableData.titles.forEach(num => {
+        if (!tableData.tables[num]) {
+          tableData.tables[num] = {
+            table_no: num,
+            status: 'available',
+            alert: [],
+            createAt: null,
+            items: [],
+            totalPrice: 0,
+            ticket_id: null
+          };
+        }
+      });
+    }
+    initEmptyTables();
+
+    // Audio Alerts Synthesizer
+    function playBeep(type = 'order') {
+      if (!CONFIG.audioAlerts) return;
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        const now = audioContext.currentTime;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        if (type === 'order') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880.00, now + 0.1);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else if (type === 'alert') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(750, now);
+          osc.frequency.setValueAtTime(600, now + 0.15);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        }
+      } catch (err) {
+        console.warn('Audio play failed:', err);
+      }
+    }
+
+    function toggleAudioAlerts() {
+      CONFIG.audioAlerts = !CONFIG.audioAlerts;
+      localStorage.setItem('pospos_audio', CONFIG.audioAlerts);
+      updateAudioIcon();
+      showToast({
+        message: CONFIG.audioAlerts ? 'เปิดเสียงแจ้งเตือนแล้ว' : 'ปิดเสียงแจ้งเตือนแล้ว',
+        type: CONFIG.audioAlerts ? 'success' : 'info'
+      });
+    }
+
+    function updateAudioIcon() {
+      const icon = document.getElementById('icon-sound');
+      if (CONFIG.audioAlerts) {
+        icon.className = 'w-4 h-4 text-emerald-500 dark:text-emerald-400';
+      } else {
+        icon.className = 'w-4 h-4 text-slate-400 dark:text-slate-500 line-through';
+      }
+    }
+
+    // MQTT Live Connection
+    function connectMqtt() {
+      const statusPill = document.getElementById('mqtt-status-pill');
+      const statusDot = document.getElementById('mqtt-status-dot');
+      const statusText = document.getElementById('mqtt-status-text');
+
+      statusPill.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-sm';
+      statusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+      statusText.innerText = 'Connecting';
+
+      const clientId = 'monitor_' + Math.random().toString(16).substring(2, 10);
+
+      try {
+        if (mqttClient) {
+          mqttClient.end(true);
+        }
+
+        logMqtt('SYS', 'Connecting to ' + CONFIG.brokerUrl + ' as ' + clientId);
+
+        mqttClient = mqtt.connect(CONFIG.brokerUrl, {
+          clientId: clientId,
+          username: CONFIG.username,
+          password: CONFIG.password,
+          clean: true,
+          reconnectPeriod: 3000,
+          connectTimeout: 8000
+        });
+
+        mqttClient.on('connect', () => {
+          logMqtt('SYS', 'Connected successfully to POSPOS MQTT Broker!');
+          statusPill.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-sm';
+          statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          statusText.innerText = 'Live';
+
+          showToast({ message: 'เชื่อมต่อ MQTT สำเร็จ พร้อมรับข้อมูลสด', type: 'success' });
+
+          const baseTopic = `pp_restaurant/${CONFIG.dbname}/pospos/v1/restaurant`;
+          
+          mqttClient.subscribe(`${baseTopic}/table/all`, (err) => {
+            if (!err) logMqtt('SUB', `${baseTopic}/table/all`);
+          });
+
+          mqttClient.subscribe(`${baseTopic}/+/+/+/#`, (err) => {
+            if (!err) logMqtt('SUB', `${baseTopic}/+/+/+/#`);
+          });
+
+          queryAllTablesOrderState();
+        });
+
+        mqttClient.on('message', (topic, message) => {
+          handleIncomingMqttMessage(topic, message.toString());
+        });
+
+        mqttClient.on('error', (err) => {
+          logMqtt('ERR', 'MQTT Error: ' + err.message);
+          statusPill.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-sm';
+          statusDot.className = 'w-2 h-2 rounded-full bg-rose-500';
+          statusText.innerText = 'Offline';
+        });
+
+        mqttClient.on('offline', () => {
+          logMqtt('WARN', 'MQTT Offline / Disconnected');
+          statusPill.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-sm';
+          statusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+          statusText.innerText = 'Reconnecting';
+        });
+
+      } catch (err) {
+        logMqtt('ERR', 'Exception during MQTT init: ' + err.message);
+      }
+    }
+
+    function handleIncomingMqttMessage(topic, payloadStr) {
+      packetCount++;
+      document.getElementById('packet-counter').innerText = packetCount;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(payloadStr);
+      } catch (e) {
+        payload = payloadStr;
+      }
+
+      logMqtt('IN', topic, payload);
+
+      const parts = topic.split('/');
+      if (topic.endsWith('/table/all')) {
+        handleTableAllMessage(payload);
+      } else if (parts.length >= 8) {
+        const ticketId = parts[5];
+        const tableId = parts[6];
+        const actionType = parts[7];
+        const subAction = parts[8];
+
+        handleTableEventMessage(tableId, ticketId, actionType, subAction, payload);
+      }
+
+      updateSummaryCounts();
+      renderTablesGrid();
+      document.getElementById('last-sync-time').innerText = new Date().toLocaleTimeString('th-TH');
+    }
+
+    function handleTableAllMessage(data) {
+      if (!data || !data.titles) return;
+      tableData.titles = data.titles;
+      tableData.buffetTimeLimit = data.buffetTimeLimit || 0;
+      tableData.buffetWarningTimeEnd = data.buffetWarningTimeEnd || 3;
+
+      initEmptyTables();
+      renderTablesGrid();
+    }
+
+    function handleTableEventMessage(tableId, ticketId, actionType, subAction, payload) {
+      if (!tableData.tables[tableId]) {
+        tableData.tables[tableId] = {
+          table_no: tableId,
+          status: 'available',
+          alert: [],
+          createAt: null,
+          items: [],
+          totalPrice: 0,
+          ticket_id: ticketId
+        };
+      }
+
+      const table = tableData.tables[tableId];
+      table.ticket_id = ticketId;
+
+      if (actionType === 'get' && subAction === 'order' && payload && payload.data) {
+        if (payload.data.length > 0) {
+          const pauseSale = payload.data[0];
+          table.status = 'occupied';
+          table.createAt = pauseSale.createAt || table.createAt || new Date().toISOString();
+          table.alert = pauseSale.alert || [];
+          
+          if (pauseSale.product_list) {
+            try {
+              table.items = typeof pauseSale.product_list === 'string' ? JSON.parse(pauseSale.product_list) : pauseSale.product_list;
+              table.totalPrice = table.items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.stock || 1)), 0);
+            } catch(e) {
+              console.warn('Failed parsing product_list', e);
+            }
+          }
+        } else {
+          table.status = 'available';
+          table.items = [];
+          table.alert = [];
+          table.totalPrice = 0;
+          table.createAt = null;
+        }
+      }
+
+      if (actionType === 'create' && subAction === 'order') {
+        table.status = 'occupied';
+        table.createAt = table.createAt || new Date().toISOString();
+        playBeep('order');
+
+        let orderedList = [];
+        if (payload && payload.data && payload.data.length > 0) {
+          const itemWrap = payload.data[0];
+          if (itemWrap.product_list) {
+            try {
+              orderedList = typeof itemWrap.product_list === 'string' ? JSON.parse(itemWrap.product_list) : itemWrap.product_list;
+            } catch(e){}
+          }
+        }
+
+        addOrderToLiveFeed(tableId, orderedList, payload.message);
+      }
+
+      if (actionType === 'status' && subAction === 'action') {
+        if (!table.alert.includes('action')) table.alert.push('action');
+        playBeep('alert');
+        addUrgentAlertCard(tableId, 'call_staff', payload.message || 'ลูกค้ากดกริ่งเรียกพนักงานที่โต๊ะ');
+      }
+
+      if (actionType === 'status' && subAction === 'check_bill') {
+        if (!table.alert.includes('check_bill')) table.alert.push('check_bill');
+        playBeep('alert');
+        addUrgentAlertCard(tableId, 'check_bill', 'ลูกค้าแจ้งขอเช็กบิลชำระเงิน');
+      }
+    }
+
+    function queryAllTablesOrderState() {
+      if (!mqttClient || !mqttClient.connected) return;
+      const baseTopic = `pp_restaurant/${CONFIG.dbname}/pospos/v1/restaurant`;
+
+      tableData.titles.forEach(tableNum => {
+        const ticketId = 'sync_' + Math.random().toString(16).substring(2, 8);
+        const reqTopic = `${baseTopic}/${ticketId}/${tableNum}/get/order/request`;
+        const reqPayload = {
+          topic: reqTopic,
+          _id: 'req_' + Math.random().toString(16).substring(2, 8),
+          success: 1,
+          platform: "E_MENU",
+          version: "1.0",
+          device_name: "Monitor",
+          ticket_id: ticketId,
+          transaction_id: 'tx_' + Math.random().toString(16).substring(2, 8),
+          data: [],
+          from: [],
+          to: [],
+          dbname: CONFIG.dbname
+        };
+        mqttClient.publish(reqTopic, JSON.stringify(reqPayload));
+      });
+    }
+
+    function renderTablesGrid() {
+      const grid = document.getElementById('tables-grid');
+      let filteredTitles = tableData.titles.filter(num => {
+        const t = tableData.tables[num] || { status: 'available', alert: [] };
+        const hasAlert = (t.alert && t.alert.length > 0);
+        const isOccupied = (t.status === 'occupied' || (t.items && t.items.length > 0));
+
+        if (currentFilter === 'active') return isOccupied;
+        if (currentFilter === 'alerts') return hasAlert;
+        if (currentFilter === 'available') return !isOccupied && !hasAlert;
+        return true;
+      });
+
+      if (filteredTitles.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-10 text-center text-slate-500 flex flex-col items-center justify-center bg-white/50 dark:bg-slate-900/30">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
+              <i data-lucide="filter-x" class="w-6 h-6 text-slate-400 dark:text-slate-500"></i>
+            </div>
+            <p class="font-semibold text-slate-700 dark:text-slate-300">ไม่พบโต๊ะที่ตรงกับตัวกรองนี้</p>
+            <p class="text-xs text-slate-500 mt-1">เลือกตัวกรองอื่นเพื่อดูสถานะโต๊ะทั้งหมด</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      grid.innerHTML = filteredTitles.map(tableNum => {
+        const table = tableData.tables[tableNum] || {
+          table_no: tableNum,
+          status: 'available',
+          alert: [],
+          items: [],
+          totalPrice: 0,
+          createAt: null
+        };
+
+        const isOccupied = (table.status === 'occupied' || (table.items && table.items.length > 0));
+        const hasCallStaff = table.alert && table.alert.includes('action');
+        const hasCheckBill = table.alert && table.alert.includes('check_bill');
+        
+        let cardBg = 'bg-white dark:bg-slate-900/80 border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm dark:shadow-md';
+        let badgeColor = 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/80';
+        let badgeIcon = 'check-circle-2';
+        let statusLabel = 'โต๊ะว่าง';
+        let ringClass = '';
+
+        if (hasCheckBill) {
+          cardBg = 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-400 dark:border-rose-600/80 shadow-md dark:shadow-xl shadow-rose-900/20';
+          badgeColor = 'bg-rose-500 text-white font-bold animate-pulse';
+          badgeIcon = 'receipt';
+          statusLabel = 'รอเช็กบิล';
+          ringClass = 'ring-2 ring-rose-500 animate-pulse-ring';
+        } else if (hasCallStaff) {
+          cardBg = 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-400 dark:border-amber-500/80 shadow-md dark:shadow-xl shadow-amber-900/20';
+          badgeColor = 'bg-amber-500 text-slate-950 font-bold animate-pulse';
+          badgeIcon = 'bell';
+          statusLabel = 'เรียกพนักงาน';
+          ringClass = 'ring-2 ring-amber-400 animate-pulse-ring';
+        } else if (isOccupied) {
+          cardBg = 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600/60 shadow-sm dark:shadow-lg shadow-blue-900/10';
+          badgeColor = 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/40 font-semibold';
+          badgeIcon = 'users';
+          statusLabel = 'มีลูกค้า';
+        }
+
+        let timeElapsedStr = '--';
+        let buffetRemainingStr = '';
+        if (table.createAt) {
+          const startMs = new Date(table.createAt).getTime();
+          const nowMs = Date.now();
+          const mins = Math.max(0, Math.floor((nowMs - startMs) / 60000));
+          timeElapsedStr = mins + ' นาที';
+
+          if (tableData.buffetTimeLimit > 0) {
+            const remMins = Math.max(0, tableData.buffetTimeLimit - mins);
+            buffetRemainingStr = 'เหลือ ' + remMins + ' น.';
+          }
+        }
+
+        const totalItemsCount = (table.items || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
+
+        return `
+          <div onclick="openTableDetail('${tableNum}')" class="group relative rounded-2xl border p-3.5 sm:p-4 cursor-pointer transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] ${cardBg} ${ringClass}">
+            
+            <div class="flex items-start justify-between gap-1.5 mb-2.5 sm:mb-3">
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-500 transition-colors">
+                  #${tableNum}
+                </span>
+                <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${badgeColor}">
+                  <i data-lucide="${badgeIcon}" class="w-3 h-3"></i>
+                  <span>${statusLabel}</span>
+                </span>
+              </div>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors"></i>
+            </div>
+
+            <div class="space-y-1 sm:space-y-1.5 text-xs text-slate-600 dark:text-slate-300 font-mono">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
+                  <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> เวลาใช้งาน:
+                </span>
+                <span class="${isOccupied ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}">
+                  ${timeElapsedStr}
+                </span>
+              </div>
+
+              ${buffetRemainingStr ? `
+                <div class="flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                  <span class="text-slate-500 dark:text-slate-400 font-sans">บุฟเฟต์:</span>
+                  <span>${buffetRemainingStr}</span>
+                </div>
+              ` : ''}
+
+              <div class="flex items-center justify-between border-t border-slate-200 dark:border-slate-800/80 pt-1 mt-1">
+                <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
+                  <i data-lucide="shopping-bag" class="w-3 h-3 text-slate-400"></i> จำนวนสั่ง:
+                </span>
+                <span class="text-slate-900 dark:text-white font-bold">
+                  ${totalItemsCount} รายการ
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 dark:text-slate-400 text-[11px] font-sans">ยอดรวม:</span>
+                <span class="text-emerald-600 dark:text-emerald-400 font-bold">
+                  ฿${(table.totalPrice || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function addOrderToLiveFeed(tableNum, items, message) {
+      liveOrdersCount++;
+      document.getElementById('live-orders-badge').innerText = liveOrdersCount;
+
+      const mobileBadge = document.getElementById('mobile-orders-badge');
+      if (mobileBadge) mobileBadge.classList.remove('hidden');
+
+      const container = document.getElementById('orders-stream-list');
+      const timeStr = new Date().toLocaleTimeString('th-TH');
+
+      const itemsHtml = (items || []).map(it => `
+        <li class="flex items-start justify-between text-xs py-1 border-b border-slate-200 dark:border-slate-800/50 last:border-0">
+          <div class="flex-1 pr-2">
+            <span class="text-slate-800 dark:text-slate-200 font-medium">${it.name || 'สินค้า'}</span>
+            ${it.note_in_order && it.note_in_order.length ? `<span class="block text-[10px] text-amber-600 dark:text-amber-400">Note: ${it.note_in_order.join(', ')}</span>` : ''}
+          </div>
+          <span class="font-mono text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap bg-emerald-500/10 px-1.5 py-0.2 rounded">x${it.stock || 1}</span>
+        </li>
+      `).join('');
+
+      const orderCard = `
+        <div class="bg-slate-50/90 dark:bg-slate-950/80 border border-emerald-500/40 rounded-xl p-3.5 shadow-sm dark:shadow-lg animate-in fade-in duration-300 hover:border-emerald-500/60 transition-colors">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-xs border border-emerald-500/30">
+                โต๊ะ #${tableNum}
+              </span>
+              <span class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">${timeStr}</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold uppercase tracking-wider">
+              New Order
+            </span>
+          </div>
+
+          <ul class="space-y-0.5 mb-2">
+            ${itemsHtml || '<li class="text-xs text-slate-500">มีออเดอร์ใหม่เข้ามา</li>'}
+          </ul>
+
+          ${message ? `<p class="text-[11px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-2 rounded-lg mt-1 font-mono">"${message}"</p>` : ''}
+        </div>
+      `;
+
+      if (container.innerHTML.includes('รอรับออเดอร์ใหม่')) {
+        container.innerHTML = orderCard;
+      } else {
+        container.insertAdjacentHTML('afterbegin', orderCard);
+      }
+    }
+
+    function clearOrdersFeedWithUndo() {
+      const container = document.getElementById('orders-stream-list');
+      if (container.innerHTML.includes('รอรับออเดอร์ใหม่')) return;
+
+      clearedOrdersBackup = {
+        html: container.innerHTML,
+        count: liveOrdersCount
+      };
+
+      container.innerHTML = `
+        <div class="border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center h-full">
+          <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
+            <i data-lucide="inbox" class="w-6 h-6 text-slate-400 dark:text-slate-500"></i>
+          </div>
+          <p class="font-medium text-slate-600 dark:text-slate-400">รอรับออเดอร์ใหม่จากลูกค้า</p>
+        </div>
+      `;
+      liveOrdersCount = 0;
+      document.getElementById('live-orders-badge').innerText = '0';
+      lucide.createIcons();
+
+      showToast({
+        message: 'ล้างรายการสั่งอาหารสดแล้ว',
+        type: 'info',
+        actionText: 'เลิกทำ',
+        onAction: () => {
+          if (clearedOrdersBackup) {
+            container.innerHTML = clearedOrdersBackup.html;
+            liveOrdersCount = clearedOrdersBackup.count;
+            document.getElementById('live-orders-badge').innerText = liveOrdersCount;
+            lucide.createIcons();
+            showToast({ message: 'กู้คืนรายการสั่งอาหารแล้ว', type: 'success' });
+          }
+        }
+      });
+    }
+
+    function addUrgentAlertCard(tableNum, type, description) {
+      const container = document.getElementById('urgent-alerts-container');
+      container.classList.remove('hidden');
+
+      const isCheckBill = (type === 'check_bill');
+      const bg = isCheckBill ? 'bg-rose-50 dark:bg-rose-950/90 border-rose-400 dark:border-rose-600 text-rose-950 dark:text-rose-200' : 'bg-amber-50 dark:bg-amber-950/90 border-amber-400 dark:border-amber-500 text-amber-950 dark:text-amber-200';
+      const icon = isCheckBill ? 'receipt' : 'bell';
+      const title = isCheckBill ? `โต๊ะ #${tableNum} ขอเช็กบิล!` : `โต๊ะ #${tableNum} เรียกพนักงาน!`;
+
+      const cardId = `alert-card-${tableNum}-${type}`;
+      if (document.getElementById(cardId)) return;
+
+      const card = `
+        <div id="${cardId}" class="flex items-center justify-between p-3.5 rounded-2xl border ${bg} shadow-md dark:shadow-xl animate-in slide-in-from-top-2 duration-300">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl ${isCheckBill ? 'bg-rose-500/20' : 'bg-amber-500/20'} flex items-center justify-center shrink-0">
+              <i data-lucide="${icon}" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold">${title}</h4>
+              <p class="text-[11px] opacity-80">${description}</p>
+            </div>
+          </div>
+          <button onclick="dismissAlertWithUndo('${cardId}', '${tableNum}', '${type}', '${description}')" class="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-slate-900/10 dark:bg-white/10 hover:bg-slate-900/20 dark:hover:bg-white/20 text-slate-900 dark:text-white text-xs font-bold active:scale-95 transition-all shrink-0">
+            รับทราบแล้ว
+          </button>
+        </div>
+      `;
+
+      container.insertAdjacentHTML('afterbegin', card);
+      lucide.createIcons();
+    }
+
+    function dismissAlertWithUndo(cardId, tableNum, type, description) {
+      const card = document.getElementById(cardId);
+      if (card) card.remove();
+
+      const alertType = (type === 'check_bill') ? 'check_bill' : 'action';
+      if (tableData.tables[tableNum] && tableData.tables[tableNum].alert) {
+        tableData.tables[tableNum].alert = tableData.tables[tableNum].alert.filter(a => a !== alertType);
+        renderTablesGrid();
+        updateSummaryCounts();
+      }
+
+      const container = document.getElementById('urgent-alerts-container');
+      if (container.children.length === 0) {
+        container.classList.add('hidden');
+      }
+
+      showToast({
+        message: `รับทราบการแจ้งเตือน โต๊ะ #${tableNum} แล้ว`,
+        type: 'info',
+        actionText: 'เลิกทำ',
+        onAction: () => {
+          if (!tableData.tables[tableNum].alert.includes(alertType)) {
+            tableData.tables[tableNum].alert.push(alertType);
+            addUrgentAlertCard(tableNum, type, description);
+            renderTablesGrid();
+            updateSummaryCounts();
+            showToast({ message: `กู้คืนการแจ้งเตือนโต๊ะ #${tableNum} แล้ว`, type: 'success' });
+          }
+        }
+      });
+    }
+
+    function logMqtt(type, topic, payload = null) {
+      const logList = document.getElementById('mqtt-logs-list');
+      if (!logList) return;
+
+      const timeStr = new Date().toLocaleTimeString('th-TH') + '.' + String(Date.now() % 1000).padStart(3, '0');
+      let typeBadge = 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+      if (type === 'IN') typeBadge = 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30';
+      if (type === 'SUB') typeBadge = 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30';
+      if (type === 'SYS') typeBadge = 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
+      if (type === 'ERR') typeBadge = 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30';
+
+      const payloadSnippet = payload ? (typeof payload === 'object' ? JSON.stringify(payload).substring(0, 100) + '...' : String(payload).substring(0, 100)) : '';
+
+      const logItem = `
+        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+            <span class="px-1.5 py-0.5 rounded ${typeBadge} font-bold">${type}</span>
+            <span>${timeStr}</span>
+          </div>
+          <div class="text-slate-800 dark:text-slate-300 break-all text-[11px] font-semibold">${topic}</div>
+          ${payloadSnippet ? `<div class="text-slate-500 text-[10px] mt-1 break-all">${payloadSnippet}</div>` : ''}
+        </div>
+      `;
+
+      if (logList.innerHTML.includes('MQTT Log stream active')) {
+        logList.innerHTML = logItem;
+      } else {
+        logList.insertAdjacentHTML('afterbegin', logItem);
+        if (logList.children.length > 80) {
+          logList.lastElementChild.remove();
+        }
+      }
+    }
+
+    function clearMqttLogs() {
+      document.getElementById('mqtt-logs-list').innerHTML = `
+        <div class="border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-500 text-xs">
+          MQTT Log cleared.
+        </div>
+      `;
+    }
+
+    function switchRightTab(tab) {
+      const ordersContent = document.getElementById('tab-content-orders');
+      const logsContent = document.getElementById('tab-content-logs');
+      const ordersBtn = document.getElementById('tab-orders-btn');
+      const logsBtn = document.getElementById('tab-logs-btn');
+
+      if (tab === 'orders') {
+        ordersContent.classList.remove('hidden');
+        logsContent.classList.add('hidden');
+        if (ordersBtn) ordersBtn.className = 'min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 shadow-sm transition-all active:scale-95';
+        if (logsBtn) logsBtn.className = 'min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-900 transition-all active:scale-95';
+      } else {
+        ordersContent.classList.add('hidden');
+        logsContent.classList.remove('hidden');
+        if (logsBtn) logsBtn.className = 'min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 shadow-sm transition-all active:scale-95';
+        if (ordersBtn) ordersBtn.className = 'min-h-[38px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-900 transition-all active:scale-95';
+      }
+    }
+
+    function openTableDetail(tableNum) {
+      selectedTableForModal = tableNum;
+      const table = tableData.tables[tableNum] || {
+        table_no: tableNum,
+        status: 'available',
+        items: [],
+        alert: [],
+        totalPrice: 0,
+        createAt: null
+      };
+
+      document.getElementById('modal-table-badge').innerText = '#' + tableNum;
+      document.getElementById('modal-table-title').innerText = 'โต๊ะ ' + tableNum;
+
+      const isOccupied = (table.status === 'occupied' || (table.items && table.items.length > 0));
+      const hasCallStaff = table.alert && table.alert.includes('action');
+      const hasCheckBill = table.alert && table.alert.includes('check_bill');
+
+      let statusText = 'ว่าง';
+      let statusClass = 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+      if (hasCheckBill) {
+        statusText = 'รอเช็กบิล';
+        statusClass = 'bg-rose-500 text-white font-bold';
+      } else if (hasCallStaff) {
+        statusText = 'เรียกพนักงาน';
+        statusClass = 'bg-amber-500 text-slate-950 font-bold';
+      } else if (isOccupied) {
+        statusText = 'มีลูกค้า';
+        statusClass = 'bg-blue-500 text-white font-bold';
+      }
+      document.getElementById('modal-table-status-pill').innerText = statusText;
+      document.getElementById('modal-table-status-pill').className = 'text-xs px-2.5 py-0.5 rounded-full ' + statusClass;
+
+      let timeStr = 'ยังไม่ได้เปิดโต๊ะ';
+      if (table.createAt) {
+        const start = new Date(table.createAt);
+        const mins = Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
+        timeStr = `เวลาเริ่ม: ${start.toLocaleTimeString('th-TH')} | นั่งแล้ว: ${mins} นาที`;
+      }
+      document.getElementById('modal-table-time-info').innerText = timeStr;
+
+      const itemsList = document.getElementById('modal-items-list');
+      if (!table.items || table.items.length === 0) {
+        itemsList.innerHTML = `
+          <div class="border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-2">
+              <i data-lucide="utensils-crossed" class="w-5 h-5 text-slate-400 dark:text-slate-500"></i>
+            </div>
+            <p class="font-medium text-slate-600 dark:text-slate-400">ไม่มีรายการอาหารที่สั่งในขณะนี้</p>
+          </div>
+        `;
+      } else {
+        itemsList.innerHTML = table.items.map(it => {
+          const itemPrice = Number(it.price || 0);
+          const itemQty = Number(it.stock || 1);
+          const lineTotal = itemPrice * itemQty;
+
+          return `
+            <div class="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/90 p-3 sm:p-3.5 rounded-xl flex items-start justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-semibold text-slate-900 dark:text-white">${it.name || 'สินค้า'}</span>
+                  <span class="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">x${itemQty}</span>
+                </div>
+                ${it.topping_in_order && it.topping_in_order.length ? `
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Toppings: ${it.topping_in_order.map(t => t.name).join(', ')}
+                  </p>
+                ` : ''}
+                ${it.note_in_order && it.note_in_order.length ? `
+                  <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    Note: ${it.note_in_order.join(', ')}
+                  </p>
+                ` : ''}
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-slate-900 dark:text-white">฿${lineTotal.toFixed(2)}</div>
+                <div class="text-[11px] text-slate-400 dark:text-slate-500">@฿${itemPrice.toFixed(2)}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('modal-total-items-count').innerText = (table.items ? table.items.length : 0) + ' รายการ';
+      document.getElementById('modal-total-price').innerText = '฿' + (table.totalPrice || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+      document.getElementById('table-detail-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTableDetailModal() {
+      document.getElementById('table-detail-modal').classList.add('hidden');
+      selectedTableForModal = null;
+    }
+
+    function triggerDirectTableSync() {
+      if (!selectedTableForModal || !mqttClient || !mqttClient.connected) {
+        showToast({ message: 'ยังไม่ได้เชื่อมต่อ MQTT', type: 'error' });
+        return;
+      }
+      const baseTopic = `pp_restaurant/${CONFIG.dbname}/pospos/v1/restaurant`;
+      const ticketId = 'sync_' + Math.random().toString(16).substring(2, 8);
+      const reqTopic = `${baseTopic}/${ticketId}/${selectedTableForModal}/get/order/request`;
+      
+      mqttClient.publish(reqTopic, JSON.stringify({
+        topic: reqTopic,
+        _id: 'req_' + Math.random().toString(16).substring(2, 8),
+        success: 1,
+        platform: "E_MENU",
+        version: "1.0",
+        device_name: "Monitor",
+        ticket_id: ticketId,
+        dbname: CONFIG.dbname
+      }));
+
+      logMqtt('PUB', reqTopic);
+      showToast({ message: `ส่งคำขอซิงค์โต๊ะ #${selectedTableForModal} แล้ว`, type: 'info' });
+    }
+
+    function setTableFilter(filter) {
+      currentFilter = filter;
+      ['all', 'active', 'alerts', 'available'].forEach(f => {
+        const btn = document.getElementById('filter-' + f);
+        if (f === filter) {
+          btn.className = 'min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition-all shadow-sm active:scale-95 flex items-center gap-1.5 shrink-0';
+        } else {
+          btn.className = 'min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-1.5 shrink-0';
+        }
+      });
+      renderTablesGrid();
+    }
+
+    function updateSummaryCounts() {
+      let available = 0, occupied = 0, action = 0, checkbill = 0;
+
+      tableData.titles.forEach(num => {
+        const t = tableData.tables[num];
+        if (!t) { available++; return; }
+
+        const hasCheck = (t.alert && t.alert.includes('check_bill'));
+        const hasAction = (t.alert && t.alert.includes('action'));
+        const isOccupied = (t.status === 'occupied' || (t.items && t.items.length > 0));
+
+        if (hasCheck) checkbill++;
+        if (hasAction) action++;
+        if (isOccupied) occupied++;
+        if (!isOccupied && !hasCheck && !hasAction) available++;
+      });
+
+      const countAvailEl = document.getElementById('count-available');
+      if (countAvailEl) {
+        document.getElementById('count-available').innerText = available;
+        document.getElementById('count-occupied').innerText = occupied;
+        document.getElementById('count-action').innerText = action;
+        document.getElementById('count-checkbill').innerText = checkbill;
+      }
+
+      document.getElementById('btn-count-all').innerText = tableData.titles.length;
+      document.getElementById('btn-count-occupied').innerText = occupied;
+      document.getElementById('btn-count-alerts').innerText = (action + checkbill);
+      document.getElementById('btn-count-free').innerText = available;
+    }
+
+    async function fetchShopInfo() {
+      try {
+        const res = await fetch(`${CONFIG.apiBase}/e-menu/shop/${CONFIG.dbname}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json && json.data) {
+          document.getElementById('shop-name-display').innerText = json.data.name || 'POSPOS Live Monitor';
+          document.getElementById('shop-branch-display').innerText = 'สาขา: ' + (json.data.branch || '00001');
+          document.getElementById('dbname-display').innerText = CONFIG.dbname;
+        }
+      } catch (err) {
+        console.warn('Failed fetching shop info:', err);
+      }
+    }
+
+    function openSettingsModal() {
+      document.getElementById('setting-dbname').value = CONFIG.dbname;
+      document.getElementById('setting-broker-url').value = CONFIG.brokerUrl;
+      document.getElementById('setting-username').value = CONFIG.username;
+      document.getElementById('setting-password').value = CONFIG.password;
+      document.getElementById('setting-audio-enabled').checked = CONFIG.audioAlerts;
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function saveSettingsAndReconnect() {
+      CONFIG.dbname = document.getElementById('setting-dbname').value.trim();
+      CONFIG.brokerUrl = document.getElementById('setting-broker-url').value.trim();
+      CONFIG.username = document.getElementById('setting-username').value.trim();
+      CONFIG.password = document.getElementById('setting-password').value.trim();
+      CONFIG.audioAlerts = document.getElementById('setting-audio-enabled').checked;
+
+      localStorage.setItem('pospos_dbname', CONFIG.dbname);
+      localStorage.setItem('pospos_broker', CONFIG.brokerUrl);
+      localStorage.setItem('pospos_user', CONFIG.username);
+      localStorage.setItem('pospos_pass', CONFIG.password);
+      localStorage.setItem('pospos_audio', CONFIG.audioAlerts);
+
+      updateAudioIcon();
+      closeSettingsModal();
+      fetchShopInfo();
+      connectMqtt();
+
+      showToast({ message: 'บันทึกการตั้งค่าและกำลังเชื่อมต่อใหม่...', type: 'success' });
+    }
+
+    function refreshAllData() {
+      const refreshIcon = document.getElementById('icon-refresh');
+      if (refreshIcon) {
+        refreshIcon.classList.add('animate-spin');
+        setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
+      }
+      fetchShopInfo();
+      queryAllTablesOrderState();
+      renderTablesGrid();
+      showToast({ message: 'ซิงค์ข้อมูลล่าสุดแล้ว', type: 'info' });
+    }
+
+    // Touch Pull to Refresh for Mobile (S25 Ultra / iPhone 16 PM)
+    function setupPullToRefresh() {
+      let touchStartY = 0;
+      let touchCurrentY = 0;
+      let isPulling = false;
+      const indicator = document.getElementById('pull-refresh-indicator');
+      const icon = document.getElementById('pull-refresh-icon');
+      const text = document.getElementById('pull-refresh-text');
+      const scrollBox = document.getElementById('tables-scroll-box');
+
+      window.addEventListener('touchstart', (e) => {
+        if (scrollBox && scrollBox.scrollTop === 0) {
+          touchStartY = e.touches[0].clientY;
+          isPulling = true;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (!isPulling) return;
+        touchCurrentY = e.touches[0].clientY;
+        const diff = touchCurrentY - touchStartY;
+
+        if (diff > 20 && diff < 150) {
+          indicator.style.opacity = Math.min(1, diff / 80).toString();
+          indicator.style.transform = `translate(-50%, ${Math.min(40, diff * 0.4)}px)`;
+          if (icon) icon.style.transform = `rotate(${diff * 2}deg)`;
+          if (diff >= 75) {
+            text.innerText = 'ปล่อยเพื่อรีเฟรช';
+          } else {
+            text.innerText = 'ดึงลงเพื่อรีเฟรช';
+          }
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', () => {
+        if (!isPulling) return;
+        const diff = touchCurrentY - touchStartY;
+        if (diff >= 75) {
+          if (navigator.vibrate) navigator.vibrate(15);
+          text.innerText = 'กำลังซิงค์ข้อมูล...';
+          if (icon) icon.classList.add('animate-spin');
+          refreshAllData();
+          setTimeout(() => {
+            indicator.style.opacity = '0';
+            indicator.style.transform = 'translate(-50%, -24px)';
+            if (icon) icon.classList.remove('animate-spin');
+          }, 800);
+        } else {
+          indicator.style.opacity = '0';
+          indicator.style.transform = 'translate(-50%, -24px)';
+        }
+        isPulling = false;
+      });
+    }
+
+    // Global Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      const isInputActive = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+
+      if (e.key === 'Escape') {
+        const tableModal = document.getElementById('table-detail-modal');
+        const settingsModal = document.getElementById('settings-modal');
+        if (!tableModal.classList.contains('hidden')) {
+          closeTableDetailModal();
+        } else if (!settingsModal.classList.contains('hidden')) {
+          closeSettingsModal();
+        }
+      }
+
+      if (e.key === 'Enter') {
+        const settingsModal = document.getElementById('settings-modal');
+        if (!settingsModal.classList.contains('hidden')) {
+          e.preventDefault();
+          saveSettingsAndReconnect();
+        }
+      }
+
+      if (!isInputActive) {
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          refreshAllData();
+        } else if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          openSettingsModal();
+        } else if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          toggleTheme();
+        }
+      }
+    });
+
+    // Network Online / Offline Detection
+    function updateNetworkStatus() {
+      const banner = document.getElementById('offline-network-banner');
+      if (navigator.onLine) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
+    }
+
+    window.addEventListener('online', () => {
+      updateNetworkStatus();
+      showToast({ message: 'กลับมาเชื่อมต่อเครือข่ายแล้ว', type: 'success' });
+      connectMqtt();
+    });
+
+    window.addEventListener('offline', () => {
+      updateNetworkStatus();
+      showToast({ message: 'ขาดการเชื่อมต่ออินเทอร์เน็ต (Offline)', type: 'error' });
+    });
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('PWA Service Worker registration skipped:', err);
+        });
+      });
+    }
+
+    // App Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      lucide.createIcons();
+      updateAudioIcon();
+      updateNetworkStatus();
+      setupPullToRefresh();
+      fetchShopInfo();
+      renderTablesGrid();
+      connectMqtt();
+
+      setInterval(() => {
+        renderTablesGrid();
+      }, 30000);
+    });
+  </script>
+</body>
+</html>
