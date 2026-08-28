@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" id="meta-theme-color" content="#020617" />
+  
+  <!-- Web App Capabilities (Standard & Apple) -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="POSPOS Monitor" />
@@ -13,6 +16,17 @@
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23059669'/><path d='M30 25 v25 a10 10 0 0 0 20 0 v-25 M40 25 v50 M60 25 v50 a10 10 0 0 0 10 -10 v-40' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>" />
   
+  <!-- Suppress non-fatal Tailwind CDN runtime warning in production -->
+  <script>
+    (function() {
+      const origWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+        origWarn.apply(console, args);
+      };
+    })();
+  </script>
+
   <!-- Tailwind CSS & Fonts -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -120,7 +134,7 @@
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 sm:gap-2">
             <h1 class="text-sm sm:text-base lg:text-lg font-bold truncate tracking-wide" id="shop-name-display">POSPOS Live Monitor</h1>
-            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.2 Pro</span>
+            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.2.1 Pro</span>
           </div>
           <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 sm:gap-2 truncate">
             <span>DB: <strong id="dbname-display" class="text-slate-700 dark:text-slate-300">1683010466811</strong></span>
@@ -523,6 +537,11 @@
       <!-- Modal Body -->
       <div class="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto text-xs bg-white dark:bg-slate-900/40">
         <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">ชื่อร้านค้า (Shop Name)</label>
+          <input type="text" id="setting-shopname" value="POSPOS Live Store" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-sans placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
+        </div>
+
+        <div>
           <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Shop ID / dbname ร้านค้า</label>
           <input type="text" id="setting-dbname" value="1683010466811" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all">
           <p class="text-[11px] text-slate-500 mt-1">รหัสฐานข้อมูลร้านค้าจาก POSPOS เช่น 1683010466811</p>
@@ -599,6 +618,7 @@
   <script>
     const CONFIG = {
       dbname: localStorage.getItem('pospos_dbname') || '1683010466811',
+      shopName: localStorage.getItem('pospos_shopname') || 'POSPOS Live Monitor',
       brokerUrl: localStorage.getItem('pospos_broker') || 'wss://pospos.co:9013/',
       username: localStorage.getItem('pospos_user') || 'mqtt_server',
       password: localStorage.getItem('pospos_pass') || 'CMvfr45tgb!serVeR',
@@ -902,7 +922,6 @@
     }
 
     function toggleAudioAndVoiceAlerts() {
-      // If either audio or voice is enabled, toggle to mute; if both are muted, enable both
       const isCurrentlyActive = CONFIG.audioAlerts || CONFIG.voiceAlerts;
       if (isCurrentlyActive) {
         CONFIG.audioAlerts = false;
@@ -1797,21 +1816,62 @@
     }
 
     async function fetchShopInfo() {
+      // Set initial display from config
+      document.getElementById('shop-name-display').innerText = CONFIG.shopName;
+      document.getElementById('dbname-display').innerText = CONFIG.dbname;
+
+      const rawApiUrl = `${CONFIG.apiBase}/e-menu/shop/${CONFIG.dbname}`;
+
+      // Strategy 1: Direct fetch with short timeout
       try {
-        const res = await fetch(`${CONFIG.apiBase}/e-menu/shop/${CONFIG.dbname}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (json && json.data) {
-          document.getElementById('shop-name-display').innerText = json.data.name || 'POSPOS Live Monitor';
-          document.getElementById('shop-branch-display').innerText = 'สาขา: ' + (json.data.branch || '00001');
-          document.getElementById('dbname-display').innerText = CONFIG.dbname;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(rawApiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.data) {
+            updateShopHeaderUI(json.data);
+            return;
+          }
         }
       } catch (err) {
-        console.warn('Failed fetching shop info:', err);
+        // Direct fetch failed (e.g. CORS), fallback to strategy 2
+      }
+
+      // Strategy 2: Graceful CORS Proxy Fallback
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rawApiUrl)}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.data) {
+            updateShopHeaderUI(json.data);
+            return;
+          }
+        }
+      } catch (proxyErr) {
+        // Silent fallback - shop UI is already initialized with saved name
       }
     }
 
+    function updateShopHeaderUI(shopData) {
+      if (!shopData) return;
+      const name = shopData.name || CONFIG.shopName;
+      const branch = shopData.branch || '00001';
+      document.getElementById('shop-name-display').innerText = name;
+      document.getElementById('shop-branch-display').innerText = 'สาขา: ' + branch;
+      document.getElementById('dbname-display').innerText = CONFIG.dbname;
+      localStorage.setItem('pospos_shopname', name);
+    }
+
     function openSettingsModal() {
+      document.getElementById('setting-shopname').value = CONFIG.shopName;
       document.getElementById('setting-dbname').value = CONFIG.dbname;
       document.getElementById('setting-broker-url').value = CONFIG.brokerUrl;
       document.getElementById('setting-username').value = CONFIG.username;
@@ -1826,6 +1886,7 @@
     }
 
     function saveSettingsAndReconnect() {
+      CONFIG.shopName = document.getElementById('setting-shopname').value.trim() || 'POSPOS Live Store';
       CONFIG.dbname = document.getElementById('setting-dbname').value.trim();
       CONFIG.brokerUrl = document.getElementById('setting-broker-url').value.trim();
       CONFIG.username = document.getElementById('setting-username').value.trim();
@@ -1833,6 +1894,7 @@
       CONFIG.audioAlerts = document.getElementById('setting-audio-enabled').checked;
       CONFIG.voiceAlerts = document.getElementById('setting-voice-enabled').checked;
 
+      localStorage.setItem('pospos_shopname', CONFIG.shopName);
       localStorage.setItem('pospos_dbname', CONFIG.dbname);
       localStorage.setItem('pospos_broker', CONFIG.brokerUrl);
       localStorage.setItem('pospos_user', CONFIG.username);
@@ -1991,7 +2053,7 @@
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.2.0').catch(err => {
+        navigator.serviceWorker.register('./sw.js?v=2.2.1').catch(err => {
           console.warn('PWA Service Worker registration skipped:', err);
         });
       });
