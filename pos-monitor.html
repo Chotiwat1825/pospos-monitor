@@ -297,23 +297,68 @@
       <!-- ACTIVE ALERTS CALLOUT BANNER (IF ANY) -->
       <div id="urgent-alerts-container" class="hidden flex flex-col gap-2.5"></div>
 
-      <!-- TABLES GRID CONTAINER -->
-      <div id="tables-scroll-box" class="flex-1 overflow-y-auto pr-1">
-        <div id="tables-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-2.5 sm:gap-3.5">
-          <!-- Initial Skeleton Loading -->
-          <div class="col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
-            <div class="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 animate-pulse h-36 flex flex-col justify-between">
-              <div class="flex justify-between items-center"><div class="h-6 w-10 bg-slate-200 dark:bg-slate-800 rounded-lg"></div><div class="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full"></div></div>
-              <div class="space-y-2"><div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-800/60 rounded"></div><div class="h-3 w-1/2 bg-slate-200 dark:bg-slate-800/60 rounded"></div></div>
-              <div class="h-4 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+      <!-- TABLES SCROLL BOX (2 SECTIONS: OCCUPIED & COLLAPSIBLE AVAILABLE) -->
+      <div id="tables-scroll-box" class="flex-1 overflow-y-auto pr-1 space-y-4">
+        
+        <!-- SECTION 1: โต๊ะที่มีลูกค้า / มีออเดอร์ / รอความช่วยเหลือ (ACTIVE TABLES) -->
+        <div id="section-occupied-container" class="space-y-2.5">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 tracking-wide flex items-center gap-1.5">
+                <span>โต๊ะที่มีลูกค้า</span>
+                <span id="occupied-section-badge" class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-mono text-xs font-bold border border-blue-500/30">0 โต๊ะ</span>
+              </h3>
             </div>
-            <div class="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 animate-pulse h-36 flex flex-col justify-between">
-              <div class="flex justify-between items-center"><div class="h-6 w-10 bg-slate-200 dark:bg-slate-800 rounded-lg"></div><div class="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full"></div></div>
-              <div class="space-y-2"><div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-800/60 rounded"></div><div class="h-3 w-1/2 bg-slate-200 dark:bg-slate-800/60 rounded"></div></div>
-              <div class="h-4 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+            <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400 hidden sm:inline">กำลังรับประทาน / มีออเดอร์</span>
+          </div>
+
+          <!-- Occupied Tables Grid -->
+          <div id="active-tables-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-2.5 sm:gap-3.5">
+            <!-- Initial Skeleton Loading -->
+            <div class="col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+              <div class="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 animate-pulse h-36 flex flex-col justify-between">
+                <div class="flex justify-between items-center"><div class="h-6 w-10 bg-slate-200 dark:bg-slate-800 rounded-lg"></div><div class="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full"></div></div>
+                <div class="space-y-2"><div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-800/60 rounded"></div><div class="h-3 w-1/2 bg-slate-200 dark:bg-slate-800/60 rounded"></div></div>
+                <div class="h-4 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- SECTION 2: โต๊ะว่าง (AVAILABLE TABLES - COLLAPSED ACCORDION BY DEFAULT) -->
+        <div id="section-available-container" class="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 space-y-2.5">
+          
+          <!-- Collapsible Accordion Header Button -->
+          <button onclick="toggleAvailableTables()" id="btn-toggle-available" class="w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/90 dark:border-slate-800/80 transition-all active:scale-[0.99] shadow-xs group">
+            <div class="flex items-center gap-2.5 sm:gap-3">
+              <div class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              </div>
+              <div class="text-left">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">โต๊ะว่างสำหรับรับลูกค้า</span>
+                  <span id="available-section-badge" class="px-2 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs font-bold">28 โต๊ะ</span>
+                </div>
+                <p id="available-section-hint" class="text-[11px] text-slate-400 dark:text-slate-500">คลิกเพื่อขยายดูโต๊ะว่างทั้งหมด</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 font-mono">
+              <span id="available-toggle-text" class="text-[11px] hidden sm:inline">เปิดดู</span>
+              <i id="available-chevron-icon" data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300"></i>
+            </div>
+          </button>
+
+          <!-- Available Tables Grid (Collapsible Container - hidden by default) -->
+          <div id="available-tables-collapse" class="hidden transition-all duration-300">
+            <div id="available-tables-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-2.5 sm:gap-3.5 pt-1">
+              <!-- Generated Available Cards -->
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
     </section>
@@ -553,6 +598,34 @@
     let audioContext = null;
     let clearedOrdersBackup = null;
     let currentMobileView = 'tables';
+    let isAvailableCollapsed = true;
+
+    // Toggle Foldable Available Tables Section
+    function toggleAvailableTables(forceExpand = null) {
+      if (forceExpand !== null) {
+        isAvailableCollapsed = !forceExpand;
+      } else {
+        isAvailableCollapsed = !isAvailableCollapsed;
+      }
+
+      const collapseContainer = document.getElementById('available-tables-collapse');
+      const chevronIcon = document.getElementById('available-chevron-icon');
+      const toggleText = document.getElementById('available-toggle-text');
+      const hintText = document.getElementById('available-section-hint');
+
+      if (isAvailableCollapsed) {
+        collapseContainer?.classList.add('hidden');
+        if (chevronIcon) chevronIcon.style.transform = 'rotate(0deg)';
+        if (toggleText) toggleText.innerText = 'เปิดดู';
+        if (hintText) hintText.innerText = 'คลิกเพื่อขยายดูโต๊ะว่างทั้งหมด';
+      } else {
+        collapseContainer?.classList.remove('hidden');
+        if (chevronIcon) chevronIcon.style.transform = 'rotate(180deg)';
+        if (toggleText) toggleText.innerText = 'พับเก็บ';
+        if (hintText) hintText.innerText = 'คลิกเพื่อพับเก็บโต๊ะว่าง';
+      }
+      lucide.createIcons();
+    }
 
     // Theme Switcher Engine (Light / Dark)
     function initTheme() {
@@ -711,8 +784,8 @@
         }
 
         const now = audioContext.currentTime;
-        const osc = audioContext.createGain ? audioContext.createOscillator() : null;
-        const gain = audioContext.createGain ? audioContext.createGain() : null;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
         if (!osc || !gain) return;
 
         osc.connect(gain);
@@ -967,141 +1040,163 @@
       });
     }
 
+    function renderSingleTableCard(tableNum) {
+      const table = tableData.tables[tableNum] || {
+        table_no: tableNum,
+        status: 'available',
+        alert: [],
+        items: [],
+        totalPrice: 0,
+        createAt: null
+      };
+
+      const isOccupied = (table.status === 'occupied' || (table.items && table.items.length > 0));
+      const hasCallStaff = table.alert && table.alert.includes('action');
+      const hasCheckBill = table.alert && table.alert.includes('check_bill');
+      
+      let cardBg = 'bg-white dark:bg-slate-900/80 border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm dark:shadow-md';
+      let badgeColor = 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/80';
+      let badgeIcon = 'check-circle-2';
+      let statusLabel = 'โต๊ะว่าง';
+      let ringClass = '';
+
+      if (hasCheckBill) {
+        cardBg = 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-400 dark:border-rose-600/80 shadow-md dark:shadow-xl shadow-rose-900/20';
+        badgeColor = 'bg-rose-500 text-white font-bold animate-pulse';
+        badgeIcon = 'receipt';
+        statusLabel = 'รอเช็กบิล';
+        ringClass = 'ring-2 ring-rose-500 animate-pulse-ring';
+      } else if (hasCallStaff) {
+        cardBg = 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-400 dark:border-amber-500/80 shadow-md dark:shadow-xl shadow-amber-900/20';
+        badgeColor = 'bg-amber-500 text-slate-950 font-bold animate-pulse';
+        badgeIcon = 'bell';
+        statusLabel = 'เรียกพนักงาน';
+        ringClass = 'ring-2 ring-amber-400 animate-pulse-ring';
+      } else if (isOccupied) {
+        cardBg = 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600/60 shadow-sm dark:shadow-lg shadow-blue-900/10';
+        badgeColor = 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/40 font-semibold';
+        badgeIcon = 'users';
+        statusLabel = 'มีลูกค้า';
+      }
+
+      let timeElapsedStr = '--';
+      let buffetRemainingStr = '';
+      if (table.createAt) {
+        const startMs = new Date(table.createAt).getTime();
+        const nowMs = Date.now();
+        const mins = Math.max(0, Math.floor((nowMs - startMs) / 60000));
+        timeElapsedStr = mins + ' นาที';
+
+        if (tableData.buffetTimeLimit > 0) {
+          const remMins = Math.max(0, tableData.buffetTimeLimit - mins);
+          buffetRemainingStr = 'เหลือ ' + remMins + ' น.';
+        }
+      }
+
+      const totalItemsCount = (table.items || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
+
+      return `
+        <div onclick="openTableDetail('${tableNum}')" class="group relative rounded-2xl border p-3.5 sm:p-4 cursor-pointer transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] ${cardBg} ${ringClass}">
+          
+          <div class="flex items-start justify-between gap-1.5 mb-2.5 sm:mb-3">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <span class="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-500 transition-colors">
+                #${tableNum}
+              </span>
+              <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${badgeColor}">
+                <i data-lucide="${badgeIcon}" class="w-3 h-3"></i>
+                <span>${statusLabel}</span>
+              </span>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors"></i>
+          </div>
+
+          <div class="space-y-1 sm:space-y-1.5 text-xs text-slate-600 dark:text-slate-300 font-mono">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
+                <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> เวลาใช้งาน:
+              </span>
+              <span class="${isOccupied ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}">
+                ${timeElapsedStr}
+              </span>
+            </div>
+
+            ${buffetRemainingStr ? `
+              <div class="flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                <span class="text-slate-500 dark:text-slate-400 font-sans">บุฟเฟต์:</span>
+                <span>${buffetRemainingStr}</span>
+              </div>
+            ` : ''}
+
+            <div class="flex items-center justify-between border-t border-slate-200 dark:border-slate-800/80 pt-1 mt-1">
+              <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
+                <i data-lucide="shopping-bag" class="w-3 h-3 text-slate-400"></i> จำนวนสั่ง:
+              </span>
+              <span class="text-slate-900 dark:text-white font-bold">
+                ${totalItemsCount} รายการ
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 dark:text-slate-400 text-[11px] font-sans">ยอดรวม:</span>
+              <span class="text-emerald-600 dark:text-emerald-400 font-bold">
+                ฿${(table.totalPrice || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </span>
+            </div>
+          </div>
+
+        </div>
+      `;
+    }
+
     function renderTablesGrid() {
-      const grid = document.getElementById('tables-grid');
-      let filteredTitles = tableData.titles.filter(num => {
-        const t = tableData.tables[num] || { status: 'available', alert: [] };
+      const activeGrid = document.getElementById('active-tables-grid');
+      const availableGrid = document.getElementById('available-tables-grid');
+      if (!activeGrid || !availableGrid) return;
+
+      const occupiedTitles = [];
+      const availableTitles = [];
+
+      tableData.titles.forEach(num => {
+        const t = tableData.tables[num] || { status: 'available', alert: [], items: [] };
         const hasAlert = (t.alert && t.alert.length > 0);
         const isOccupied = (t.status === 'occupied' || (t.items && t.items.length > 0));
 
-        if (currentFilter === 'active') return isOccupied;
-        if (currentFilter === 'alerts') return hasAlert;
-        if (currentFilter === 'available') return !isOccupied && !hasAlert;
-        return true;
-      });
-
-      if (filteredTitles.length === 0) {
-        grid.innerHTML = `
-          <div class="col-span-full border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-10 text-center text-slate-500 flex flex-col items-center justify-center bg-white/50 dark:bg-slate-900/30">
-            <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
-              <i data-lucide="filter-x" class="w-6 h-6 text-slate-400 dark:text-slate-500"></i>
-            </div>
-            <p class="font-semibold text-slate-700 dark:text-slate-300">ไม่พบโต๊ะที่ตรงกับตัวกรองนี้</p>
-            <p class="text-xs text-slate-500 mt-1">เลือกตัวกรองอื่นเพื่อดูสถานะโต๊ะทั้งหมด</p>
-          </div>
-        `;
-        lucide.createIcons();
-        return;
-      }
-
-      grid.innerHTML = filteredTitles.map(tableNum => {
-        const table = tableData.tables[tableNum] || {
-          table_no: tableNum,
-          status: 'available',
-          alert: [],
-          items: [],
-          totalPrice: 0,
-          createAt: null
-        };
-
-        const isOccupied = (table.status === 'occupied' || (table.items && table.items.length > 0));
-        const hasCallStaff = table.alert && table.alert.includes('action');
-        const hasCheckBill = table.alert && table.alert.includes('check_bill');
-        
-        let cardBg = 'bg-white dark:bg-slate-900/80 border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm dark:shadow-md';
-        let badgeColor = 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/80';
-        let badgeIcon = 'check-circle-2';
-        let statusLabel = 'โต๊ะว่าง';
-        let ringClass = '';
-
-        if (hasCheckBill) {
-          cardBg = 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-400 dark:border-rose-600/80 shadow-md dark:shadow-xl shadow-rose-900/20';
-          badgeColor = 'bg-rose-500 text-white font-bold animate-pulse';
-          badgeIcon = 'receipt';
-          statusLabel = 'รอเช็กบิล';
-          ringClass = 'ring-2 ring-rose-500 animate-pulse-ring';
-        } else if (hasCallStaff) {
-          cardBg = 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-400 dark:border-amber-500/80 shadow-md dark:shadow-xl shadow-amber-900/20';
-          badgeColor = 'bg-amber-500 text-slate-950 font-bold animate-pulse';
-          badgeIcon = 'bell';
-          statusLabel = 'เรียกพนักงาน';
-          ringClass = 'ring-2 ring-amber-400 animate-pulse-ring';
-        } else if (isOccupied) {
-          cardBg = 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600/60 shadow-sm dark:shadow-lg shadow-blue-900/10';
-          badgeColor = 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/40 font-semibold';
-          badgeIcon = 'users';
-          statusLabel = 'มีลูกค้า';
-        }
-
-        let timeElapsedStr = '--';
-        let buffetRemainingStr = '';
-        if (table.createAt) {
-          const startMs = new Date(table.createAt).getTime();
-          const nowMs = Date.now();
-          const mins = Math.max(0, Math.floor((nowMs - startMs) / 60000));
-          timeElapsedStr = mins + ' นาที';
-
-          if (tableData.buffetTimeLimit > 0) {
-            const remMins = Math.max(0, tableData.buffetTimeLimit - mins);
-            buffetRemainingStr = 'เหลือ ' + remMins + ' น.';
+        if (isOccupied || hasAlert) {
+          if (currentFilter === 'all' || currentFilter === 'active' || (currentFilter === 'alerts' && hasAlert)) {
+            occupiedTitles.push(num);
+          }
+        } else {
+          if (currentFilter === 'all' || currentFilter === 'available') {
+            availableTitles.push(num);
           }
         }
+      });
 
-        const totalItemsCount = (table.items || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
-
-        return `
-          <div onclick="openTableDetail('${tableNum}')" class="group relative rounded-2xl border p-3.5 sm:p-4 cursor-pointer transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] ${cardBg} ${ringClass}">
-            
-            <div class="flex items-start justify-between gap-1.5 mb-2.5 sm:mb-3">
-              <div class="flex items-center gap-1.5 sm:gap-2">
-                <span class="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-500 transition-colors">
-                  #${tableNum}
-                </span>
-                <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${badgeColor}">
-                  <i data-lucide="${badgeIcon}" class="w-3 h-3"></i>
-                  <span>${statusLabel}</span>
-                </span>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors"></i>
+      // Render Occupied Section
+      if (occupiedTitles.length === 0) {
+        activeGrid.innerHTML = `
+          <div class="col-span-full border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-6 sm:p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center bg-white/40 dark:bg-slate-900/30">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center mb-2 text-slate-400">
+              <i data-lucide="coffee" class="w-5 h-5"></i>
             </div>
-
-            <div class="space-y-1 sm:space-y-1.5 text-xs text-slate-600 dark:text-slate-300 font-mono">
-              <div class="flex items-center justify-between">
-                <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
-                  <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> เวลาใช้งาน:
-                </span>
-                <span class="${isOccupied ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}">
-                  ${timeElapsedStr}
-                </span>
-              </div>
-
-              ${buffetRemainingStr ? `
-                <div class="flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
-                  <span class="text-slate-500 dark:text-slate-400 font-sans">บุฟเฟต์:</span>
-                  <span>${buffetRemainingStr}</span>
-                </div>
-              ` : ''}
-
-              <div class="flex items-center justify-between border-t border-slate-200 dark:border-slate-800/80 pt-1 mt-1">
-                <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
-                  <i data-lucide="shopping-bag" class="w-3 h-3 text-slate-400"></i> จำนวนสั่ง:
-                </span>
-                <span class="text-slate-900 dark:text-white font-bold">
-                  ${totalItemsCount} รายการ
-                </span>
-              </div>
-
-              <div class="flex items-center justify-between">
-                <span class="text-slate-500 dark:text-slate-400 text-[11px] font-sans">ยอดรวม:</span>
-                <span class="text-emerald-600 dark:text-emerald-400 font-bold">
-                  ฿${(table.totalPrice || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                </span>
-              </div>
-            </div>
-
+            <p class="font-bold text-slate-700 dark:text-slate-300">${currentFilter === 'alerts' ? 'ไม่มีโต๊ะที่ต้องการความช่วยเหลือในขณะนี้' : 'ขณะนี้ยังไม่มีลูกค้าเปิดโต๊ะ'}</p>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">${currentFilter === 'alerts' ? 'สถานะปกติทุกโต๊ะ' : 'เมื่อมีลูกค้าสแกนสั่งอาหารหรือเปิดโต๊ะ จะแสดงที่นี่ทันที'}</p>
           </div>
         `;
-      }).join('');
+      } else {
+        activeGrid.innerHTML = occupiedTitles.map(num => renderSingleTableCard(num)).join('');
+      }
+
+      // Render Available Section
+      availableGrid.innerHTML = availableTitles.map(num => renderSingleTableCard(num)).join('');
+
+      // Update Section badges
+      const occupiedBadge = document.getElementById('occupied-section-badge');
+      if (occupiedBadge) occupiedBadge.innerText = `${occupiedTitles.length} โต๊ะ`;
+
+      const availBadge = document.getElementById('available-section-badge');
+      if (availBadge) availBadge.innerText = `${availableTitles.length} โต๊ะ`;
 
       lucide.createIcons();
     }
@@ -1448,6 +1543,22 @@
           btn.className = 'min-h-[38px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-1.5 shrink-0';
         }
       });
+
+      const sectionOccupied = document.getElementById('section-occupied-container');
+      const sectionAvailable = document.getElementById('section-available-container');
+
+      if (filter === 'available') {
+        sectionOccupied?.classList.add('hidden');
+        sectionAvailable?.classList.remove('hidden');
+        toggleAvailableTables(true); // Auto expand when user clicks 'available' filter
+      } else if (filter === 'active' || filter === 'alerts') {
+        sectionOccupied?.classList.remove('hidden');
+        sectionAvailable?.classList.add('hidden');
+      } else {
+        sectionOccupied?.classList.remove('hidden');
+        sectionAvailable?.classList.remove('hidden');
+      }
+
       renderTablesGrid();
     }
 
