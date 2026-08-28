@@ -164,9 +164,10 @@
           <i id="icon-theme" data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
         </button>
 
-        <!-- Sound Toggle Button -->
-        <button id="btn-sound-toggle" onclick="toggleAudioAlerts()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="เปิด/ปิดเสียงแจ้งเตือน">
+        <!-- Sound & Voice Toggle Button -->
+        <button id="btn-sound-toggle" onclick="toggleAudioAndVoiceAlerts()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center relative" title="เปิด/ปิดเสียงแจ้งเตือนและเสียงพูด AI">
           <i id="icon-sound" data-lucide="volume-2" class="w-4 h-4 text-emerald-500 dark:text-emerald-400"></i>
+          <span id="voice-indicator-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" title="เสียงพูดภาษาไทยเปิดอยู่"></span>
         </button>
 
         <!-- Refresh Button -->
@@ -175,7 +176,7 @@
         </button>
 
         <!-- Settings Button -->
-        <button onclick="openSettingsModal()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="ตั้งค่าร้านค้า / MQTT (S)">
+        <button onclick="openSettingsModal()" class="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm flex items-center justify-center" title="ตั้งค่าร้านค้า / เสียงพูด / MQTT (S)">
           <i data-lucide="settings" class="w-4 h-4"></i>
         </button>
       </div>
@@ -509,7 +510,7 @@
       <div class="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
         <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <i data-lucide="settings-2" class="w-4 h-4 text-emerald-500"></i>
-          ตั้งค่าการเชื่อมต่อ Monitor
+          ตั้งค่าการเชื่อมต่อ & เสียงแจ้งเตือน
         </h3>
         <div class="flex items-center gap-2">
           <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-md hidden sm:inline-block">ESC</span>
@@ -543,19 +544,40 @@
           </div>
         </div>
 
-        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80">
+        <!-- THAI VOICE ANNOUNCEMENT SETTINGS SECTION -->
+        <div class="pt-3 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
           <div class="flex items-center justify-between">
             <div>
-              <span class="font-semibold text-slate-700 dark:text-slate-300 block">เสียงแจ้งเตือน (Audio Beep)</span>
-              <span class="text-[11px] text-slate-500">ส่งเสียงเมื่อมีออเดอร์ใหม่ / เรียกพนักงาน</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-blue-500"></i>
+                เสียงพูดภาษาไทย AI (Web Speech API)
+              </span>
+              <span class="text-[11px] text-slate-500">อ่านออกเสียงโต๊ะสั่งอาหาร / เรียกพนักงาน / เช็กบิล</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="setting-voice-enabled" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-300 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+          <button type="button" onclick="testVoiceAlert()" class="min-h-[32px] px-3 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 font-semibold text-[11px] flex items-center gap-1.5 border border-blue-200 dark:border-blue-800 active:scale-95 transition-all">
+            <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> ทดสอบเสียงพูดภาษาไทย
+          </button>
+        </div>
+
+        <!-- BEEP SOUND SETTINGS SECTION -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-semibold text-slate-700 dark:text-slate-300 block">เสียงบี๊บแจ้งเตือน (Audio Beep)</span>
+              <span class="text-[11px] text-slate-500">ส่งเสียงบี๊บความถี่สูงเมื่อมีกิจกรรม</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="setting-audio-enabled" checked class="sr-only peer">
               <div class="w-11 h-6 bg-slate-300 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
             </label>
           </div>
-          <button type="button" onclick="playBeep('order')" class="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
-            <i data-lucide="play" class="w-3 h-3"></i> ทดสอบฟังเสียงแจ้งเตือน
+          <button type="button" onclick="playBeep('order')" class="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+            <i data-lucide="play" class="w-3 h-3"></i> ทดสอบฟังเสียงบี๊บ
           </button>
         </div>
       </div>
@@ -581,7 +603,8 @@
       username: localStorage.getItem('pospos_user') || 'mqtt_server',
       password: localStorage.getItem('pospos_pass') || 'CMvfr45tgb!serVeR',
       apiBase: 'https://go.pospos.co/api/v1',
-      audioAlerts: localStorage.getItem('pospos_audio') !== 'false'
+      audioAlerts: localStorage.getItem('pospos_audio') !== 'false',
+      voiceAlerts: localStorage.getItem('pospos_voice') !== 'false'
     };
 
     let mqttClient = null;
@@ -599,6 +622,71 @@
     let clearedOrdersBackup = null;
     let currentMobileView = 'tables';
     let isAvailableCollapsed = true;
+    
+    // Thai Voice TTS Engine State
+    let thaiVoice = null;
+    let lastAnnouncements = {};
+
+    // Initialize Thai Voice from browser SpeechSynthesis
+    function initThaiVoice() {
+      if (!('speechSynthesis' in window)) {
+        console.warn('Speech Synthesis not supported in this browser environment.');
+        return;
+      }
+
+      function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) return;
+
+        // Prioritize native Thai voices (e.g. Google ภาษาไทย, Kanya, Pattara, th-TH)
+        thaiVoice = voices.find(v => v.lang === 'th-TH' || v.lang === 'th_TH' || v.lang.toLowerCase().startsWith('th')) ||
+                    voices.find(v => v.name.toLowerCase().includes('thai') || v.name.includes('ไทย')) ||
+                    null;
+      }
+
+      loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    }
+
+    // Speak Thai Announcement with Web Speech API
+    function speakThai(text, priority = false) {
+      if (!CONFIG.voiceAlerts || !('speechSynthesis' in window)) return;
+
+      // Prevent duplicate rapid speech within 3.5 seconds
+      const now = Date.now();
+      if (lastAnnouncements[text] && (now - lastAnnouncements[text] < 3500)) {
+        return;
+      }
+      lastAnnouncements[text] = now;
+
+      try {
+        if (priority) {
+          window.speechSynthesis.cancel(); // Cancel lower priority queue on urgent alert
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'th-TH';
+        if (thaiVoice) utterance.voice = thaiVoice;
+        utterance.rate = 1.05; // Slightly brisk, clear pace for live announcements
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        utterance.onerror = (e) => {
+          console.warn('TTS utterance error:', e);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('SpeechSynthesis speak failed:', err);
+      }
+    }
+
+    function testVoiceAlert() {
+      speakThai('ทดสอบระบบเสียงพูดภาษาไทย POSPOS Live Monitor ค่ะ', true);
+      showToast({ message: 'กำลังทดสอบออกเสียงพูดภาษาไทย...', type: 'info' });
+    }
 
     // Toggle Foldable Available Tables Section
     function toggleAvailableTables(forceExpand = null) {
@@ -813,22 +901,47 @@
       }
     }
 
-    function toggleAudioAlerts() {
-      CONFIG.audioAlerts = !CONFIG.audioAlerts;
+    function toggleAudioAndVoiceAlerts() {
+      // If either audio or voice is enabled, toggle to mute; if both are muted, enable both
+      const isCurrentlyActive = CONFIG.audioAlerts || CONFIG.voiceAlerts;
+      if (isCurrentlyActive) {
+        CONFIG.audioAlerts = false;
+        CONFIG.voiceAlerts = false;
+      } else {
+        CONFIG.audioAlerts = true;
+        CONFIG.voiceAlerts = true;
+      }
+
       localStorage.setItem('pospos_audio', CONFIG.audioAlerts);
+      localStorage.setItem('pospos_voice', CONFIG.voiceAlerts);
       updateAudioIcon();
+
       showToast({
-        message: CONFIG.audioAlerts ? 'เปิดเสียงแจ้งเตือนแล้ว' : 'ปิดเสียงแจ้งเตือนแล้ว',
-        type: CONFIG.audioAlerts ? 'success' : 'info'
+        message: CONFIG.voiceAlerts ? 'เปิดเสียงพูดภาษาไทย & เสียงบี๊บแล้ว' : 'ปิดเสียงทั้งหมด (Muted) แล้ว',
+        type: CONFIG.voiceAlerts ? 'success' : 'info'
       });
+
+      if (CONFIG.voiceAlerts) {
+        speakThai('เปิดเสียงพูดแจ้งเตือนแล้วค่ะ');
+      }
     }
 
     function updateAudioIcon() {
       const icon = document.getElementById('icon-sound');
-      if (CONFIG.audioAlerts) {
+      const voiceDot = document.getElementById('voice-indicator-dot');
+
+      if (CONFIG.audioAlerts || CONFIG.voiceAlerts) {
         icon.className = 'w-4 h-4 text-emerald-500 dark:text-emerald-400';
       } else {
         icon.className = 'w-4 h-4 text-slate-400 dark:text-slate-500 line-through';
+      }
+
+      if (voiceDot) {
+        if (CONFIG.voiceAlerts) {
+          voiceDot.classList.remove('hidden');
+        } else {
+          voiceDot.classList.add('hidden');
+        }
       }
     }
 
@@ -999,18 +1112,29 @@
           }
         }
 
+        const totalItemsCount = (orderedList || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
+        
+        // Trigger Thai Voice Announcement
+        if (totalItemsCount > 0) {
+          speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ ${totalItemsCount} รายการค่ะ`);
+        } else {
+          speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ค่ะ`);
+        }
+
         addOrderToLiveFeed(tableId, orderedList, payload.message);
       }
 
       if (actionType === 'status' && subAction === 'action') {
         if (!table.alert.includes('action')) table.alert.push('action');
         playBeep('alert');
+        speakThai(`โต๊ะ ${tableId} เรียกพนักงานค่ะ`, true);
         addUrgentAlertCard(tableId, 'call_staff', payload.message || 'ลูกค้ากดกริ่งเรียกพนักงานที่โต๊ะ');
       }
 
       if (actionType === 'status' && subAction === 'check_bill') {
         if (!table.alert.includes('check_bill')) table.alert.push('check_bill');
         playBeep('alert');
+        speakThai(`โต๊ะ ${tableId} ขอเช็กบิลค่ะ`, true);
         addUrgentAlertCard(tableId, 'check_bill', 'ลูกค้าแจ้งขอเช็กบิลชำระเงิน');
       }
     }
@@ -1693,6 +1817,7 @@
       document.getElementById('setting-username').value = CONFIG.username;
       document.getElementById('setting-password').value = CONFIG.password;
       document.getElementById('setting-audio-enabled').checked = CONFIG.audioAlerts;
+      document.getElementById('setting-voice-enabled').checked = CONFIG.voiceAlerts;
       document.getElementById('settings-modal').classList.remove('hidden');
     }
 
@@ -1706,12 +1831,14 @@
       CONFIG.username = document.getElementById('setting-username').value.trim();
       CONFIG.password = document.getElementById('setting-password').value.trim();
       CONFIG.audioAlerts = document.getElementById('setting-audio-enabled').checked;
+      CONFIG.voiceAlerts = document.getElementById('setting-voice-enabled').checked;
 
       localStorage.setItem('pospos_dbname', CONFIG.dbname);
       localStorage.setItem('pospos_broker', CONFIG.brokerUrl);
       localStorage.setItem('pospos_user', CONFIG.username);
       localStorage.setItem('pospos_pass', CONFIG.password);
       localStorage.setItem('pospos_audio', CONFIG.audioAlerts);
+      localStorage.setItem('pospos_voice', CONFIG.voiceAlerts);
 
       updateAudioIcon();
       closeSettingsModal();
@@ -1719,6 +1846,9 @@
       connectMqtt();
 
       showToast({ message: 'บันทึกการตั้งค่าและกำลังเชื่อมต่อใหม่...', type: 'success' });
+      if (CONFIG.voiceAlerts) {
+        speakThai('บันทึกการตั้งค่าแล้วค่ะ');
+      }
     }
 
     function refreshAllData() {
@@ -1846,6 +1976,18 @@
       showToast({ message: 'ขาดการเชื่อมต่ออินเทอร์เน็ต (Offline)', type: 'error' });
     });
 
+    // Unlock speech synthesis on first user interaction
+    function unlockAudioAndSpeech() {
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+    }
+    window.addEventListener('click', unlockAudioAndSpeech, { once: true });
+    window.addEventListener('touchstart', unlockAudioAndSpeech, { once: true });
+
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -1858,6 +2000,7 @@
     // App Initialization
     document.addEventListener('DOMContentLoaded', () => {
       initTheme();
+      initThaiVoice();
       lucide.createIcons();
       updateAudioIcon();
       updateNetworkStatus();
