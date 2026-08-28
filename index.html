@@ -134,7 +134,7 @@
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 sm:gap-2">
             <h1 class="text-sm sm:text-base lg:text-lg font-bold truncate tracking-wide" id="shop-name-display">POSPOS Live Monitor</h1>
-            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.2.1 Pro</span>
+            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.2.2 Pro</span>
           </div>
           <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 sm:gap-2 truncate">
             <span>DB: <strong id="dbname-display" class="text-slate-700 dark:text-slate-300">1683010466811</strong></span>
@@ -303,9 +303,20 @@
           </button>
         </div>
 
-        <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono">
-          <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i> ซิงค์:</span>
-          <span id="last-sync-time" class="text-slate-800 dark:text-slate-300 font-semibold">--:--:--</span>
+        <!-- Live Clock & Sync Status Area -->
+        <div class="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
+          <!-- Live Realtime Clock (Ticking every second) -->
+          <div class="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 bg-slate-200/60 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl font-bold border border-slate-300/50 dark:border-slate-700/50">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-500"></i>
+            <span id="live-clock">--:--:--</span>
+          </div>
+
+          <!-- Last Sync Status -->
+          <div class="hidden sm:flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>ซิงค์:</span>
+            <span id="last-sync-time" class="font-semibold text-slate-700 dark:text-slate-300">--:--:--</span>
+          </div>
         </div>
       </div>
 
@@ -587,8 +598,8 @@
         <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2">
           <div class="flex items-center justify-between">
             <div>
-              <span class="font-semibold text-slate-700 dark:text-slate-300 block">เสียงบี๊บแจ้งเตือน (Audio Beep)</span>
-              <span class="text-[11px] text-slate-500">ส่งเสียงบี๊บความถี่สูงเมื่อมีกิจกรรม</span>
+              <span class="font-semibold text-slate-700 dark:text-slate-300 block">เสียงกระดิ่งบี๊บ (Chime Beep)</span>
+              <span class="text-[11px] text-slate-500">ส่งเสียงกระดิ่งคู่ 3 โทนเมื่อมีออเดอร์เข้า</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="setting-audio-enabled" checked class="sr-only peer">
@@ -596,7 +607,7 @@
             </label>
           </div>
           <button type="button" onclick="playBeep('order')" class="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
-            <i data-lucide="play" class="w-3 h-3"></i> ทดสอบฟังเสียงบี๊บ
+            <i data-lucide="play" class="w-3 h-3"></i> ทดสอบฟังเสียงกระดิ่ง
           </button>
         </div>
       </div>
@@ -642,26 +653,51 @@
     let clearedOrdersBackup = null;
     let currentMobileView = 'tables';
     let isAvailableCollapsed = true;
+    let hasCompletedInitialSync = false;
     
     // Thai Voice TTS Engine State
     let thaiVoice = null;
     let lastAnnouncements = {};
 
+    // Live Realtime Digital Clock Function
+    function updateLiveClock() {
+      const clockEl = document.getElementById('live-clock');
+      if (clockEl) {
+        clockEl.innerText = new Date().toLocaleTimeString('th-TH');
+      }
+    }
+
+    // Initialize & Unlock Audio Context for Browser Autoplay policy
+    function initAudioContext() {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume().catch(() => {});
+        }
+        if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+      } catch (err) {
+        console.warn('AudioContext init error:', err);
+      }
+    }
+
     // Initialize Thai Voice from browser SpeechSynthesis
     function initThaiVoice() {
-      if (!('speechSynthesis' in window)) {
-        console.warn('Speech Synthesis not supported in this browser environment.');
-        return;
-      }
+      if (!('speechSynthesis' in window)) return;
 
       function loadVoices() {
-        const voices = window.speechSynthesis.getVoices();
-        if (voices.length === 0) return;
+        try {
+          const voices = window.speechSynthesis.getVoices();
+          if (!voices || voices.length === 0) return;
 
-        // Prioritize native Thai voices (e.g. Google ภาษาไทย, Kanya, Pattara, th-TH)
-        thaiVoice = voices.find(v => v.lang === 'th-TH' || v.lang === 'th_TH' || v.lang.toLowerCase().startsWith('th')) ||
-                    voices.find(v => v.name.toLowerCase().includes('thai') || v.name.includes('ไทย')) ||
-                    null;
+          // Prioritize native Thai voices (e.g. Google ภาษาไทย, Kanya, Pattara, th-TH, th_TH)
+          thaiVoice = voices.find(v => v.lang === 'th-TH' || v.lang === 'th_TH' || v.lang.toLowerCase().startsWith('th')) ||
+                      voices.find(v => v.name.toLowerCase().includes('thai') || v.name.includes('ไทย')) ||
+                      null;
+        } catch (e) {}
       }
 
       loadVoices();
@@ -674,22 +710,27 @@
     function speakThai(text, priority = false) {
       if (!CONFIG.voiceAlerts || !('speechSynthesis' in window)) return;
 
-      // Prevent duplicate rapid speech within 3.5 seconds
+      // Prevent duplicate rapid speech within 3 seconds
       const now = Date.now();
-      if (lastAnnouncements[text] && (now - lastAnnouncements[text] < 3500)) {
+      if (lastAnnouncements[text] && (now - lastAnnouncements[text] < 3000)) {
         return;
       }
       lastAnnouncements[text] = now;
 
       try {
-        if (priority) {
-          window.speechSynthesis.cancel(); // Cancel lower priority queue on urgent alert
+        initAudioContext();
+
+        // Avoid speech engine hanging in Chrome
+        window.speechSynthesis.cancel();
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
         }
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH';
+        if (!thaiVoice) initThaiVoice();
         if (thaiVoice) utterance.voice = thaiVoice;
-        utterance.rate = 1.05; // Slightly brisk, clear pace for live announcements
+        utterance.rate = 1.05;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
@@ -697,13 +738,16 @@
           console.warn('TTS utterance error:', e);
         };
 
-        window.speechSynthesis.speak(utterance);
+        setTimeout(() => {
+          window.speechSynthesis.speak(utterance);
+        }, 40);
       } catch (err) {
         console.warn('SpeechSynthesis speak failed:', err);
       }
     }
 
     function testVoiceAlert() {
+      initAudioContext();
       speakThai('ทดสอบระบบเสียงพูดภาษาไทย POSPOS Live Monitor ค่ะ', true);
       showToast({ message: 'กำลังทดสอบออกเสียงพูดภาษาไทย...', type: 'info' });
     }
@@ -880,41 +924,49 @@
     }
     initEmptyTables();
 
-    // Audio Alerts Synthesizer
+    // High-Fidelity Audio Synthesizer (Chime & Bells)
     function playBeep(type = 'order') {
       if (!CONFIG.audioAlerts) return;
       try {
-        if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioContext.state === 'suspended') {
-          audioContext.resume();
-        }
+        initAudioContext();
+        if (!audioContext) return;
 
         const now = audioContext.currentTime;
-        const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
-        if (!osc || !gain) return;
-
-        osc.connect(gain);
         gain.connect(audioContext.destination);
 
         if (type === 'order') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(587.33, now);
-          osc.frequency.setValueAtTime(880.00, now + 0.1);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-          osc.start(now);
-          osc.stop(now + 0.35);
+          // Melodic 3-tone Chime (C5 -> E5 -> G5)
+          const notes = [523.25, 659.25, 783.99];
+          notes.forEach((freq, idx) => {
+            const osc = audioContext.createOscillator();
+            const noteGain = audioContext.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+            
+            noteGain.gain.setValueAtTime(0, now + idx * 0.11);
+            noteGain.gain.linearRampToValueAtTime(0.35, now + idx * 0.11 + 0.02);
+            noteGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.11 + 0.35);
+
+            osc.connect(noteGain);
+            noteGain.connect(gain);
+
+            osc.start(now + idx * 0.11);
+            osc.stop(now + idx * 0.11 + 0.36);
+          });
         } else if (type === 'alert') {
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(750, now);
-          osc.frequency.setValueAtTime(600, now + 0.15);
-          gain.gain.setValueAtTime(0.25, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-          osc.start(now);
-          osc.stop(now + 0.4);
+          // Urgent 2-tone Alert Bell (880Hz -> 587Hz)
+          const osc1 = audioContext.createOscillator();
+          osc1.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(880, now);
+          osc1.frequency.setValueAtTime(587.33, now + 0.14);
+
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+          osc1.connect(gain);
+          osc1.start(now);
+          osc1.stop(now + 0.46);
         }
       } catch (err) {
         console.warn('Audio play failed:', err);
@@ -922,6 +974,7 @@
     }
 
     function toggleAudioAndVoiceAlerts() {
+      initAudioContext();
       const isCurrentlyActive = CONFIG.audioAlerts || CONFIG.voiceAlerts;
       if (isCurrentlyActive) {
         CONFIG.audioAlerts = false;
@@ -941,7 +994,8 @@
       });
 
       if (CONFIG.voiceAlerts) {
-        speakThai('เปิดเสียงพูดแจ้งเตือนแล้วค่ะ');
+        playBeep('order');
+        speakThai('เปิดเสียงแจ้งเตือนแล้วค่ะ');
       }
     }
 
@@ -1011,6 +1065,9 @@
           });
 
           queryAllTablesOrderState();
+          setTimeout(() => {
+            hasCompletedInitialSync = true;
+          }, 3000);
         });
 
         mqttClient.on('message', (topic, message) => {
@@ -1063,7 +1120,10 @@
 
       updateSummaryCounts();
       renderTablesGrid();
-      document.getElementById('last-sync-time').innerText = new Date().toLocaleTimeString('th-TH');
+      const lastSyncEl = document.getElementById('last-sync-time');
+      if (lastSyncEl) {
+        lastSyncEl.innerText = new Date().toLocaleTimeString('th-TH');
+      }
     }
 
     function handleTableAllMessage(data) {
@@ -1090,8 +1150,10 @@
       }
 
       const table = tableData.tables[tableId];
+      const prevItemsCount = (table.items || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
       table.ticket_id = ticketId;
 
+      // Handle order query sync or direct get order
       if (actionType === 'get' && subAction === 'order' && payload && payload.data) {
         if (payload.data.length > 0) {
           const pauseSale = payload.data[0];
@@ -1103,6 +1165,16 @@
             try {
               table.items = typeof pauseSale.product_list === 'string' ? JSON.parse(pauseSale.product_list) : pauseSale.product_list;
               table.totalPrice = table.items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.stock || 1)), 0);
+
+              const currentItemsCount = table.items.reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
+              
+              // If order was added dynamically after startup sync completed
+              if (hasCompletedInitialSync && currentItemsCount > prevItemsCount && prevItemsCount >= 0) {
+                const diff = currentItemsCount - prevItemsCount;
+                playBeep('order');
+                speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ ${diff} รายการค่ะ`);
+                addOrderToLiveFeed(tableId, table.items, 'อัปเดตรายการสั่งอาหารสด');
+              }
             } catch(e) {
               console.warn('Failed parsing product_list', e);
             }
@@ -1116,11 +1188,11 @@
         }
       }
 
-      if (actionType === 'create' && subAction === 'order') {
+      // Handle explicit order creation event
+      if ((actionType === 'create' || actionType === 'add' || actionType === 'update') && (subAction === 'order' || subAction === 'order_detail')) {
         table.status = 'occupied';
         table.createAt = table.createAt || new Date().toISOString();
-        playBeep('order');
-
+        
         let orderedList = [];
         if (payload && payload.data && payload.data.length > 0) {
           const itemWrap = payload.data[0];
@@ -1133,7 +1205,8 @@
 
         const totalItemsCount = (orderedList || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
         
-        // Trigger Thai Voice Announcement
+        // Sound & Thai Voice Trigger
+        playBeep('order');
         if (totalItemsCount > 0) {
           speakThai(`โต๊ะ ${tableId} มีออเดอร์ใหม่ ${totalItemsCount} รายการค่ะ`);
         } else {
@@ -1143,6 +1216,7 @@
         addOrderToLiveFeed(tableId, orderedList, payload.message);
       }
 
+      // Handle customer calling staff
       if (actionType === 'status' && subAction === 'action') {
         if (!table.alert.includes('action')) table.alert.push('action');
         playBeep('alert');
@@ -1150,6 +1224,7 @@
         addUrgentAlertCard(tableId, 'call_staff', payload.message || 'ลูกค้ากดกริ่งเรียกพนักงานที่โต๊ะ');
       }
 
+      // Handle customer checking bill
       if (actionType === 'status' && subAction === 'check_bill') {
         if (!table.alert.includes('check_bill')) table.alert.push('check_bill');
         playBeep('alert');
@@ -1257,7 +1332,7 @@
           <div class="space-y-1 sm:space-y-1.5 text-xs text-slate-600 dark:text-slate-300 font-mono">
             <div class="flex items-center justify-between">
               <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
-                <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> เวลาใช้งาน:
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i> เวลาใช้งาน:
               </span>
               <span class="${isOccupied ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}">
                 ${timeElapsedStr}
@@ -1273,7 +1348,7 @@
 
             <div class="flex items-center justify-between border-t border-slate-200 dark:border-slate-800/80 pt-1 mt-1">
               <span class="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 font-sans">
-                <i data-lucide="shopping-bag" class="w-3 h-3 text-slate-400"></i> จำนวนสั่ง:
+                <i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-slate-400"></i> จำนวนสั่ง:
               </span>
               <span class="text-slate-900 dark:text-white font-bold">
                 ${totalItemsCount} รายการ
@@ -1886,6 +1961,7 @@
     }
 
     function saveSettingsAndReconnect() {
+      initAudioContext();
       CONFIG.shopName = document.getElementById('setting-shopname').value.trim() || 'POSPOS Live Store';
       CONFIG.dbname = document.getElementById('setting-dbname').value.trim();
       CONFIG.brokerUrl = document.getElementById('setting-broker-url').value.trim();
@@ -1982,6 +2058,7 @@
 
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
+      initAudioContext();
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
       const isInputActive = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
 
@@ -2038,22 +2115,15 @@
       showToast({ message: 'ขาดการเชื่อมต่ออินเทอร์เน็ต (Offline)', type: 'error' });
     });
 
-    // Unlock speech synthesis on first user interaction
-    function unlockAudioAndSpeech() {
-      if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-      if ('speechSynthesis' in window && window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-    }
-    window.addEventListener('click', unlockAudioAndSpeech, { once: true });
-    window.addEventListener('touchstart', unlockAudioAndSpeech, { once: true });
+    // Global listeners to unlock audio on first user interaction
+    ['click', 'touchstart', 'touchend', 'mousedown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, initAudioContext, { passive: true });
+    });
 
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.2.1').catch(err => {
+        navigator.serviceWorker.register('./sw.js?v=2.2.2').catch(err => {
           console.warn('PWA Service Worker registration skipped:', err);
         });
       });
@@ -2063,6 +2133,8 @@
     document.addEventListener('DOMContentLoaded', () => {
       initTheme();
       initThaiVoice();
+      updateLiveClock();
+      setInterval(updateLiveClock, 1000); // Live digital clock ticks every second
       lucide.createIcons();
       updateAudioIcon();
       updateNetworkStatus();
