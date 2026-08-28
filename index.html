@@ -83,7 +83,7 @@
   </script>
 
   <style>
-    /* Safe Area insets for iPhone 16 Pro Max, Samsung S25 Ultra, Dynamic Island */
+    /* Safe Area insets for iPhone 16 Pro Max, Samsung S25 Ultra, Dynamic Island & Home Indicator */
     :root {
       --sat: env(safe-area-inset-top, 0px);
       --sab: env(safe-area-inset-bottom, 0px);
@@ -95,6 +95,25 @@
       padding-top: var(--sat);
       padding-left: var(--sal);
       padding-right: var(--sar);
+      padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    }
+
+    @media (min-width: 1024px) {
+      body {
+        padding-bottom: 0px;
+      }
+    }
+
+    /* Fixed Bottom Nav with safe area padding above iPhone Home Indicator */
+    .mobile-bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+      padding-top: 8px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+      min-height: calc(58px + env(safe-area-inset-bottom, 0px));
     }
 
     /* Scrollbars */
@@ -116,7 +135,7 @@
   </style>
 </head>
 
-<body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white font-sans bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden pb-16 lg:pb-0">
+<body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white font-sans bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden">
 
   <!-- OFFLINE STATUS BANNER -->
   <div id="offline-network-banner" class="hidden bg-rose-600 text-white text-xs font-semibold px-4 py-2 text-center flex items-center justify-center gap-2 shadow-lg z-50">
@@ -169,7 +188,7 @@
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 sm:gap-2">
             <h1 class="text-sm sm:text-base lg:text-lg font-bold truncate tracking-wide" id="shop-name-display">POSPOS Live Monitor</h1>
-            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.3.1 Pro</span>
+            <span class="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-semibold shrink-0">v2.3.2 Pro</span>
           </div>
           <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 sm:gap-2 truncate">
             <span>DB: <strong id="dbname-display" class="text-slate-700 dark:text-slate-300">1683010466811</strong></span>
@@ -490,20 +509,20 @@
     </section>
   </main>
 
-  <!-- MOBILE BOTTOM NAVIGATION (OPTIMIZED FOR S25 ULTRA & IPHONE 16 PRO MAX THUMB REACH) -->
-  <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-around shadow-2xl transition-colors pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-    <button onclick="setMobileView('tables')" id="mobile-nav-tables" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95">
+  <!-- MOBILE BOTTOM NAVIGATION (FLUSH TO BOTTOM WITH IPHONE HOME BAR PROTECTION) -->
+  <nav class="lg:hidden mobile-bottom-nav bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-6 flex items-center justify-around shadow-2xl transition-colors">
+    <button onclick="setMobileView('tables')" id="mobile-nav-tables" class="flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95">
       <i data-lucide="layout-grid" class="w-5 h-5"></i>
-      <span class="text-[10px]">ผังโต๊ะ</span>
+      <span class="text-[11px] tracking-tight">ผังโต๊ะ</span>
     </button>
-    <button onclick="setMobileView('orders')" id="mobile-nav-orders" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95 relative">
+    <button onclick="setMobileView('orders')" id="mobile-nav-orders" class="flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95 relative">
       <i data-lucide="receipt" class="w-5 h-5"></i>
-      <span class="text-[10px]">ออเดอร์สด</span>
-      <span id="mobile-orders-badge" class="absolute top-0 right-2 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+      <span class="text-[11px] tracking-tight">ออเดอร์สด</span>
+      <span id="mobile-orders-badge" class="absolute top-1 right-3 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
     </button>
-    <button onclick="setMobileView('logs')" id="mobile-nav-logs" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95">
+    <button onclick="setMobileView('logs')" id="mobile-nav-logs" class="flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95">
       <i data-lucide="radio" class="w-5 h-5"></i>
-      <span class="text-[10px]">MQTT Log</span>
+      <span class="text-[11px] tracking-tight">MQTT Log</span>
     </button>
   </nav>
 
@@ -1013,9 +1032,9 @@
       ['tables', 'orders', 'logs'].forEach(v => {
         const btn = document.getElementById('mobile-nav-' + v);
         if (v === view) {
-          btn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95';
+          btn.className = 'flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-emerald-600 dark:text-emerald-400 font-bold transition-all active:scale-95';
         } else {
-          btn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95';
+          btn.className = 'flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-slate-500 dark:text-slate-400 font-medium transition-all active:scale-95';
         }
       });
 
@@ -2307,7 +2326,7 @@
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2.3.1').catch(err => {
+        navigator.serviceWorker.register('./sw.js?v=2.3.2').catch(err => {
           console.warn('PWA Service Worker registration skipped:', err);
         });
       });
