@@ -189,6 +189,80 @@
     <!-- LEFT / MAIN: FLOOR PLAN & TABLES (8 COLS ON DESKTOP, SWITCHABLE ON MOBILE) -->
     <section id="section-tables" class="lg:col-span-8 flex flex-col gap-3.5 sm:gap-4 overflow-hidden h-full">
       
+      <!-- LIVE STORE KPI MINI DASHBOARD -->
+      <div id="live-kpi-dashboard" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        
+        <!-- KPI 1: Occupied Tables & Occupancy Rate -->
+        <div class="bg-white/90 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">มีลูกค้าปัจจุบัน</span>
+            <div class="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="kpi-occupied-tables" class="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white">0</span>
+            <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">/ <span id="kpi-total-tables">28</span> โต๊ะ</span>
+          </div>
+          <div class="mt-1.5 flex items-center gap-1.5">
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div id="kpi-occupancy-bar" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <span id="kpi-occupancy-percent" class="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">0%</span>
+          </div>
+        </div>
+
+        <!-- KPI 2: Active Items Ordered -->
+        <div class="bg-white/90 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">อาหารกำลังสั่ง/ทาน</span>
+            <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <i data-lucide="utensils" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="kpi-active-items" class="text-lg sm:text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">0</span>
+            <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">รายการ</span>
+          </div>
+          <p id="kpi-items-sub" class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-1">
+            จาก <span id="kpi-active-order-tables" class="font-bold text-slate-700 dark:text-slate-300">0</span> โต๊ะมีออเดอร์
+          </p>
+        </div>
+
+        <!-- KPI 3: Estimated Active Revenue (Unbilled) -->
+        <div class="bg-white/90 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">ยอดรวมสะสมสด</span>
+            <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <i data-lucide="circle-dollar-sign" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="kpi-total-revenue" class="text-base sm:text-lg font-bold font-mono text-indigo-600 dark:text-indigo-400 truncate">฿0.00</span>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-1 font-mono">
+            เฉลี่ย <span id="kpi-avg-per-table" class="font-bold text-slate-700 dark:text-slate-300">฿0</span> / โต๊ะ
+          </p>
+        </div>
+
+        <!-- KPI 4: Attention Needed & Avg Table Time -->
+        <div class="bg-white/90 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">สถานะ / นั่งเฉลี่ย</span>
+            <div id="kpi-alert-icon-box" class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <i id="kpi-alert-icon" data-lucide="check" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="kpi-urgent-status" class="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">ปกติทุกโต๊ะ</span>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-1 font-mono">
+            นั่งเฉลี่ย: <span id="kpi-avg-minutes" class="font-bold text-slate-700 dark:text-slate-300">0</span> นาที
+          </p>
+        </div>
+
+      </div>
+
       <!-- Toolbar & Filters -->
       <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white/90 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/80 p-2.5 sm:p-3 rounded-2xl shadow-sm dark:shadow-md transition-colors">
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
@@ -637,8 +711,10 @@
         }
 
         const now = audioContext.currentTime;
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
+        const osc = audioContext.createGain ? audioContext.createOscillator() : null;
+        const gain = audioContext.createGain ? audioContext.createGain() : null;
+        if (!osc || !gain) return;
+
         osc.connect(gain);
         gain.connect(audioContext.destination);
 
@@ -1377,6 +1453,13 @@
 
     function updateSummaryCounts() {
       let available = 0, occupied = 0, action = 0, checkbill = 0;
+      let totalActiveItems = 0;
+      let totalActiveRevenue = 0;
+      let tablesWithOrders = 0;
+      let totalDiningMinutes = 0;
+      let diningCount = 0;
+
+      const totalTables = tableData.titles.length || 28;
 
       tableData.titles.forEach(num => {
         const t = tableData.tables[num];
@@ -1388,10 +1471,23 @@
 
         if (hasCheck) checkbill++;
         if (hasAction) action++;
-        if (isOccupied) occupied++;
+        if (isOccupied) {
+          occupied++;
+          const itemsCount = (t.items || []).reduce((acc, it) => acc + (Number(it.stock) || 1), 0);
+          totalActiveItems += itemsCount;
+          totalActiveRevenue += Number(t.totalPrice || 0);
+          if (itemsCount > 0) tablesWithOrders++;
+
+          if (t.createAt) {
+            const mins = Math.max(0, Math.floor((Date.now() - new Date(t.createAt).getTime()) / 60000));
+            totalDiningMinutes += mins;
+            diningCount++;
+          }
+        }
         if (!isOccupied && !hasCheck && !hasAction) available++;
       });
 
+      // Top header pills
       const countAvailEl = document.getElementById('count-available');
       if (countAvailEl) {
         document.getElementById('count-available').innerText = available;
@@ -1400,10 +1496,59 @@
         document.getElementById('count-checkbill').innerText = checkbill;
       }
 
-      document.getElementById('btn-count-all').innerText = tableData.titles.length;
-      document.getElementById('btn-count-occupied').innerText = occupied;
-      document.getElementById('btn-count-alerts').innerText = (action + checkbill);
-      document.getElementById('btn-count-free').innerText = available;
+      // Filter buttons
+      const btnAll = document.getElementById('btn-count-all');
+      if (btnAll) {
+        document.getElementById('btn-count-all').innerText = totalTables;
+        document.getElementById('btn-count-occupied').innerText = occupied;
+        document.getElementById('btn-count-alerts').innerText = (action + checkbill);
+        document.getElementById('btn-count-free').innerText = available;
+      }
+
+      // KPI Mini Dashboard
+      const kpiOccupied = document.getElementById('kpi-occupied-tables');
+      if (kpiOccupied) {
+        kpiOccupied.innerText = occupied;
+        document.getElementById('kpi-total-tables').innerText = totalTables;
+        const occPercent = totalTables > 0 ? Math.round((occupied / totalTables) * 100) : 0;
+        document.getElementById('kpi-occupancy-percent').innerText = occPercent + '%';
+        document.getElementById('kpi-occupancy-bar').style.width = Math.min(100, occPercent) + '%';
+
+        document.getElementById('kpi-active-items').innerText = totalActiveItems;
+        document.getElementById('kpi-active-order-tables').innerText = tablesWithOrders;
+
+        document.getElementById('kpi-total-revenue').innerText = '฿' + totalActiveRevenue.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const avgPerTable = occupied > 0 ? Math.round(totalActiveRevenue / occupied) : 0;
+        document.getElementById('kpi-avg-per-table').innerText = '฿' + avgPerTable.toLocaleString('th-TH');
+
+        const avgMins = diningCount > 0 ? Math.round(totalDiningMinutes / diningCount) : 0;
+        document.getElementById('kpi-avg-minutes').innerText = avgMins;
+
+        const totalAlerts = action + checkbill;
+        const urgentStatusEl = document.getElementById('kpi-urgent-status');
+        const urgentIconBox = document.getElementById('kpi-alert-icon-box');
+        const urgentIcon = document.getElementById('kpi-alert-icon');
+
+        if (totalAlerts > 0) {
+          if (checkbill > 0) {
+            urgentStatusEl.innerText = `${checkbill} โต๊ะรอเช็กบิล`;
+            urgentStatusEl.className = 'text-sm sm:text-base font-bold text-rose-600 dark:text-rose-400 truncate';
+            urgentIconBox.className = 'w-6 h-6 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0';
+            urgentIcon.setAttribute('data-lucide', 'receipt');
+          } else {
+            urgentStatusEl.innerText = `${action} โต๊ะเรียกพนักงาน`;
+            urgentStatusEl.className = 'text-sm sm:text-base font-bold text-amber-600 dark:text-amber-400 truncate';
+            urgentIconBox.className = 'w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0';
+            urgentIcon.setAttribute('data-lucide', 'bell');
+          }
+        } else {
+          urgentStatusEl.innerText = 'ปกติทุกโต๊ะ';
+          urgentStatusEl.className = 'text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate';
+          urgentIconBox.className = 'w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0';
+          urgentIcon.setAttribute('data-lucide', 'check');
+        }
+        lucide.createIcons();
+      }
     }
 
     async function fetchShopInfo() {
